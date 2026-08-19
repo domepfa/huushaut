@@ -1,4 +1,4 @@
-const CACHE = "haushaltsplan-v1";
+const CACHE = "haushaltsplan-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -15,8 +15,27 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
-  // Firestore/Firebase-Anfragen immer live aus dem Netz holen, nicht cachen
-  if (e.request.url.includes("googleapis.com") || e.request.url.includes("gstatic.com/firebasejs")) return;
+  const url = e.request.url;
+
+  // Echte Firestore-Datenanfragen: immer live aus dem Netz, nie zwischenspeichern
+  if (url.includes("firestore.googleapis.com")) return;
+
+  // Firebase-SDK-Dateien und Schriftarten ändern sich kaum: aus dem Cache laden,
+  // falls vorhanden (schneller Start), sonst laden und für nächstes Mal merken.
+  if (url.includes("gstatic.com/firebasejs") || url.includes("fonts.googleapis.com") || url.includes("fonts.gstatic.com")) {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(e.request).then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, clone));
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then((cached) => cached || fetch(e.request))
   );
