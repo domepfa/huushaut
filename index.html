@@ -106,6 +106,7 @@
   let db = null;
   let docRef = null;
   let connStatus = "wait"; // wait | ok | err
+  let saveError = null;
 
   const pad = (n) => String(n).padStart(2, "0");
   function getISOWeekKey(d) {
@@ -132,6 +133,14 @@
     const d = document.createElement("div");
     d.textContent = s;
     return d.innerHTML;
+  }
+  function focusInput(id) {
+    // renderApp() baut das Formular neu auf, daher den Fokus erst nach dem
+    // nächsten Frame setzen, wenn das neue Element wirklich im DOM ist.
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (el) el.focus();
+    });
   }
   function showToast(msg) {
     const wrap = document.getElementById("toastWrap");
@@ -164,9 +173,13 @@
     if (!db) return;
     try {
       await setDoc(docRef, { list: nextTasks, shopping: nextShopping });
+      if (saveError) { saveError = null; renderApp(); }
     } catch (e) {
       console.error(e);
-      showToast("Speichern fehlgeschlagen — Verbindung prüfen");
+      saveError = e && e.code === "permission-denied"
+        ? "Speichern blockiert: Firestore-Regeln erlauben kein Schreiben. In der Firebase-Konsole unter „Firestore Database → Regeln" prüfen und veröffentlichen."
+        : "Speichern fehlgeschlagen. Änderungen sind nur lokal auf diesem Gerät gespeichert und gehen beim Schließen evtl. verloren, bis die Verbindung wieder da ist.";
+      renderApp();
     }
   }
 
@@ -178,7 +191,7 @@
     if (!title) return;
     const task = { id: uid(), title, category: activeTab, status: "active", createdAt: Date.now(), doneBy: null, doneAt: null, periodKey: null };
     await persist([task, ...tasks], shopping);
-    input.value = "";
+    focusInput("newTitle");
   }
   async function markDone(id, person) {
     const task = tasks.find((t) => t.id === id);
@@ -204,7 +217,7 @@
     if (!text) return;
     const item = { id: uid(), text, createdAt: Date.now() };
     await persist(tasks, [item, ...shopping]);
-    input.value = "";
+    focusInput("newShopItem");
   }
   async function boughtItem(id) {
     await persist(tasks, shopping.filter((s) => s.id !== id));
@@ -233,6 +246,7 @@
             <button class="icon-btn" id="settingsLink">⚙ Einstellungen</button>
           </div>
         </header>
+        ${saveError ? `<div class="confirm-bar" style="align-items:flex-start;"><span>⚠️ ${saveError}</span></div>` : ""}
         <nav id="tabs"></nav>
         <div id="formSlot"></div>
         <div id="content"></div>
