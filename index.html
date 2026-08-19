@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Haushaltsplan</title>
 <link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="apple-touch-icon" id="appleIcon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAE1ElEQVR4nO3dPVYbSRiG0RZn1kJCTua1OPWSnM5anJGTsBkmsPEIEFL/VHV11XtvbtRI39NfSegcn6aDuX98eG19DdTz8vR8an0N55pejGFnmtpGsfsDG3qu2TuG3R7M4LPEXiFUfxCDzxa1Q6j2ww0+JdUKofgPNfjUVDqEu5I/zPBTW+kZK1KTwaeFEttg8wYw/LRSYvY2BWD4aW3rDK4OwPBzFFtmcVUAhp+jWTuTiwMw/BzVmtlcFIDh5+iWzujsAAw/vVgyq7MCMPz0Zu7M3gzA8NOrObNb9KsQ0JurAbj71/fr5/fWlzC0WzP8ZQCGv7634RdBXddm2RGogV8/v38aehG0cfHbdO7+9cwZ9G8//t3hSvJc+vaoDbCjuXd522A/nwJw969j6VCLoLxLs20DVHbpvL/k31LXuzORu39ZJQfY+4Jyzt8L2ACVlL572wZ1/A3A3b+cWsMqgjLOZ90GKGjLeX/JY1COAArZczD3CC3F3TQ5/mzVahhFsN7bzNsAG7UewtaP3zsBrHSkY8hRrqNHAljhiAN3xGvqgQAWOvKgHWkr9eLkDfB8PQ2XvxzPI4AZehr8cyK4zRHohl6Hf5r6vva92ABXjDRAtsFlNsAXRhr+aRrv9ynFBvhg9EGxCd6zAc6MPvzTlPE7LmED/JE4GLaBDTBNU+bwT1Pu730uegMYgN+SN0HsBjD8/0t+LiI3QPILfkvaNojbAIb/urTnJ2YDpL2wW6VsgogNYPiXS3nOhg8g5YWsIeG5G/oIlPAC7mXUI9GQARj8OkaMYLgjkOGvZ8TndqgARnyBjma053iYI9BoL0wPRjgSdR+AwW+r9wi6PgIZ/vZ6fw26DaD3J34kPb8WXR6Ben7CR9fbkairAAx+H3qKoJsjkOHvR0+vVVcb4JKenuxR9XTH/6ibDQA1CIBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiPZP6wsYUa3/MMJ/BlKeDUA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANFO948Pr60vAlqxAYgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAot29PD2fWl8EtPDy9HyyAYgmAKIJgGgCINrdNP1+M9D6QmBPbzNvAxBNAET7G4BjECnOZ90GINq7AGwBRvdxxm0Aon0KwBZgVJdm2wYg2sUAbAFG89VM2wBE+zIAW4BRXJvlqxtABPTu1gw7AhHtZgC2AL2aM7uzNoAI6M3cmZ19BBIBvVgyq4veA4iAo1s6o4vfBIuAo1ozm6s+BRIBR7N2Jld/DCoCjmLLLG76O4AIaG3rDG7+Q5gIaKXE7BUd3vvHh9eSPw8uKXnTLfpVCNuA2krPWLWBtQ0oqdbNtfodWwhsUftUsduRRQgssddxevczuxC4Zu/3kU3ftIqBaWr74cnhPrURxdiO9knhf2rWg/9pvPYFAAAAAElFTkSuQmCC" />
 <meta name="theme-color" content="#26362B" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -88,6 +88,16 @@
   };
   const PEOPLE = { Ich: "#2F6D5C", Sarah: "#C9587A" };
   const LS_KEY = "haushaltsplan-firebase-config";
+
+  // Fest eingebaute Firebase-Zugangsdaten für Huushaut
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyD8xfS4b3cyQtoP8AdD6ezqWNbGAY0uCvM",
+    authDomain: "huushaut.firebaseapp.com",
+    projectId: "huushaut",
+    storageBucket: "huushaut.firebasestorage.app",
+    messagingSenderId: "235343277866",
+    appId: "1:235343277866:web:7ebb67c817a04112aa7853"
+  };
 
   let tasks = [];
   let shopping = [];
@@ -418,13 +428,7 @@
   }
 
   // ---------- Start ----------
-  const saved = localStorage.getItem(LS_KEY);
-  if (saved) {
-    try { connectFirebase(JSON.parse(saved)); }
-    catch (e) { renderSetupScreen(); }
-  } else {
-    renderSetupScreen();
-  }
+  connectFirebase(FIREBASE_CONFIG);
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js").catch(() => {}));
