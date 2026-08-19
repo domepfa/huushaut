@@ -2,116 +2,84 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Haushaltsplan</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="theme-color" content="#26362B" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Haushalt" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #EEF2E9;
-    --card: #ffffff;
-    --ink: #26362B;
-    --muted: #5C6E5F;
-    --border: #E4E9DC;
-    --weekly: #C98A2C;
-    --monthly: #4A7A93;
-    --once: #B15D6C;
-    --person-a: #2F6D5C;
-    --person-b: #C9587A;
+    --bg: #EEF2E9; --card: #ffffff; --ink: #26362B; --muted: #5C6E5F; --border: #E4E9DC;
+    --weekly: #C98A2C; --monthly: #4A7A93; --once: #B15D6C; --shopping: #6E8F5C;
+    --person-a: #2F6D5C; --person-b: #C9587A;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Inter', sans-serif;
-  }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
-  header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; }
-  h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .sub { color: var(--muted); font-size: 14px; margin: 0; }
-  .reset-link { background: none; border: none; color: #8A6B6B; font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; }
-  .reset-link:hover { opacity: 0.7; }
-  .confirm-bar { background: #FBECEC; border: 1px solid #E3B8B8; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
-  .confirm-bar .btns { display: flex; gap: 8px; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 90px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
+  .dot.ok { background: #4B8B6B; } .dot.err { background: #C9587A; } .dot.wait { background: #C9A93E; }
+  .icon-btn { background: none; border: none; color: #8A6B6B; font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 4px; }
+  .icon-btn:hover { opacity: 0.7; }
+  .confirm-bar { background: #FBECEC; border: 1px solid #E3B8B8; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; gap: 10px; }
+  .confirm-bar .btns { display: flex; gap: 8px; flex-shrink: 0; }
   .confirm-bar button.danger { background: var(--once); color: #fff; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
   .confirm-bar button.plain { background: #fff; border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
-  nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 22px; }
-  nav button { border: 1px solid var(--border); background: #fff; color: #4A5A4D; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+  nav button { border: 1px solid var(--border); background: #fff; color: #4A5A4D; padding: 8px 13px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; }
   nav button.active { border-color: transparent; color: #fff; }
   nav button .count { background: #EEF2E9; color: var(--muted); font-size: 11px; padding: 1px 7px; border-radius: 999px; }
   nav button.active .count { background: rgba(255,255,255,0.25); color: #fff; }
-  form.add { display: flex; gap: 8px; margin-bottom: 22px; }
+  form.add { display: flex; gap: 8px; margin-bottom: 20px; }
   form.add input { flex: 1; border: 1px solid var(--border); background: #fff; border-radius: 12px; padding: 11px 14px; font-size: 14px; font-family: inherit; outline: none; }
   form.add input:focus { box-shadow: 0 0 0 2px #C9D3C0; }
-  form.add button { color: #fff; border: none; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-  .empty { border: 1px dashed #C9D3C0; color: #7C8A7E; border-radius: 12px; padding: 34px; text-align: center; font-size: 14px; }
+  form.add button { color: #fff; border: none; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .empty { border: 1px dashed #C9D3C0; color: #7C8A7E; border-radius: 12px; padding: 32px; text-align: center; font-size: 14px; }
   .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
   @media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } }
   .tile { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); transition: transform .15s, box-shadow .15s; }
   .tile:hover { transform: rotate(0deg) !important; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
   .tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .tile-title { font-size: 14px; font-weight: 500; line-height: 1.4; margin: 0; }
-  .del-btn { background: none; border: none; color: #B7BDAF; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+  .del-btn { background: none; border: none; color: #B7BDAF; cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0; font-size: 15px; }
   .del-btn:hover { color: #d15757; }
   .mark-row { display: flex; gap: 6px; margin-top: 12px; }
-  .mark-row button { flex: 1; font-size: 12px; border-radius: 10px; padding: 7px 0; background: transparent; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 4px; }
-  .done-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .mark-row button { flex: 1; font-size: 12px; border-radius: 10px; padding: 8px 0; background: transparent; cursor: pointer; font-weight: 500; }
+  .done-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; gap: 6px; }
   .avatar { width: 16px; height: 16px; border-radius: 999px; color: #fff; font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; margin-right: 6px; }
   .note { font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
   .loading { color: #8A968C; font-size: 14px; }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 14px; padding: 10px 16px; border-radius: 999px; display: flex; align-items: center; gap: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 14px; padding: 10px 16px; border-radius: 999px; display: flex; align-items: center; gap: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); z-index: 20; }
   .toast button { background: none; border: none; color: #fff; cursor: pointer; opacity: 0.7; }
-  .config-warning { background: #FFF6E0; border: 1px solid #E9CE8A; border-radius: 12px; padding: 16px; font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
-  .config-warning code { background: #fff; padding: 1px 5px; border-radius: 4px; }
+  .shop-list { display: flex; flex-direction: column; gap: 8px; }
+  .shop-row { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .shop-row span { font-size: 14px; }
+  .shop-row button { background: #fff; border: 1px solid var(--shopping); color: var(--shopping); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+
+  /* --- Setup-Bildschirm --- */
+  .setup { max-width: 480px; margin: 60px auto; padding: 0 20px; }
+  .setup h2 { font-family: 'Fraunces', serif; font-size: 22px; margin-bottom: 6px; }
+  .setup p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .setup ol { color: var(--muted); font-size: 14px; line-height: 1.8; padding-left: 20px; }
+  .setup textarea { width: 100%; min-height: 140px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; margin-top: 10px; }
+  .setup button.save { background: var(--ink); color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-size: 14px; margin-top: 12px; cursor: pointer; }
+  .setup .err { color: #C9587A; font-size: 13px; margin-top: 8px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Haushaltsplan</h1>
-      <p class="sub">Geteilt zwischen Ich &amp; Sarah</p>
-    </div>
-    <button class="reset-link" id="resetLink">↺ Zurücksetzen</button>
-  </header>
-
-  <div id="confirmBar" class="confirm-bar" style="display:none;">
-    <span>Wirklich alle Aufgaben unwiderruflich löschen?</span>
-    <div class="btns">
-      <button class="danger" id="confirmYes">Ja, löschen</button>
-      <button class="plain" id="confirmNo">Abbrechen</button>
-    </div>
-  </div>
-
-  <nav id="tabs"></nav>
-  <form class="add" id="addForm" style="display:none;">
-    <input id="newTitle" type="text" placeholder="Neue Aufgabe…" autocomplete="off" />
-    <button type="submit">+ Anlegen</button>
-  </form>
-
-  <div id="content"><p class="loading">Lädt…</p></div>
-</div>
-
+<div id="root"><div class="wrap"><p class="loading">Lädt…</p></div></div>
 <div id="toastWrap"></div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
-  // ---------------------------------------------------------------
-  // HIER DEINE FIREBASE-ZUGANGSDATEN EINTRAGEN (siehe Anleitung im Chat)
-  // ---------------------------------------------------------------
-  const firebaseConfig = {
-    apiKey: "DEIN_API_KEY",
-    authDomain: "DEIN_PROJEKT.firebaseapp.com",
-    projectId: "DEIN_PROJEKT",
-    storageBucket: "DEIN_PROJEKT.appspot.com",
-    messagingSenderId: "DEINE_SENDER_ID",
-    appId: "DEINE_APP_ID"
-  };
-
-  const CONFIG_MISSING = firebaseConfig.apiKey === "DEIN_API_KEY";
 
   const CATEGORIES = {
     weekly: { label: "Wöchentlich", accent: "#C98A2C", note: "Kehrt am Montag zurück" },
@@ -119,11 +87,14 @@
     once: { label: "Einmalig", accent: "#B15D6C", note: "Verschwindet endgültig" },
   };
   const PEOPLE = { Ich: "#2F6D5C", Sarah: "#C9587A" };
+  const LS_KEY = "haushaltsplan-firebase-config";
 
   let tasks = [];
+  let shopping = [];
   let activeTab = "weekly";
   let db = null;
   let docRef = null;
+  let connStatus = "wait"; // wait | ok | err
 
   const pad = (n) => String(n).padStart(2, "0");
   function getISOWeekKey(d) {
@@ -146,6 +117,17 @@
     return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
   }
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+  function showToast(msg) {
+    const wrap = document.getElementById("toastWrap");
+    wrap.innerHTML = `<div class="toast">${msg}<button id="toastClose">✕</button></div>`;
+    document.getElementById("toastClose").onclick = () => (wrap.innerHTML = "");
+    setTimeout(() => (wrap.innerHTML = ""), 2200);
+  }
 
   function applyResets(list) {
     const now = new Date();
@@ -163,81 +145,167 @@
     return { next, changed };
   }
 
-  async function persist(next) {
-    tasks = next;
-    render();
+  async function persist(nextTasks, nextShopping) {
+    tasks = nextTasks;
+    shopping = nextShopping;
+    renderApp();
     if (!db) return;
     try {
-      await setDoc(docRef, { list: next });
+      await setDoc(docRef, { list: nextTasks, shopping: nextShopping });
     } catch (e) {
-      console.error("Speichern fehlgeschlagen", e);
+      console.error(e);
       showToast("Speichern fehlgeschlagen — Verbindung prüfen");
     }
   }
 
-  function showToast(msg) {
-    const wrap = document.getElementById("toastWrap");
-    wrap.innerHTML = `<div class="toast">${msg}<button id="toastClose">✕</button></div>`;
-    document.getElementById("toastClose").onclick = () => (wrap.innerHTML = "");
-    setTimeout(() => (wrap.innerHTML = ""), 2200);
-  }
-
+  // ---------- Aufgaben ----------
   async function addTask(e) {
     e.preventDefault();
     const input = document.getElementById("newTitle");
     const title = input.value.trim();
     if (!title) return;
     const task = { id: uid(), title, category: activeTab, status: "active", createdAt: Date.now(), doneBy: null, doneAt: null, periodKey: null };
-    await persist([task, ...tasks]);
+    await persist([task, ...tasks], shopping);
     input.value = "";
   }
-
   async function markDone(id, person) {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     if (task.category === "once") {
       showToast(`„${task.title}" erledigt von ${person}`);
-      await persist(tasks.filter((t) => t.id !== id));
+      await persist(tasks.filter((t) => t.id !== id), shopping);
       return;
     }
     const now = new Date();
     const next = tasks.map((t) => t.id === id ? { ...t, status: "done", doneBy: person, doneAt: Date.now(), periodKey: currentPeriodKey(t.category, now) } : t);
-    await persist(next);
+    await persist(next, shopping);
+  }
+  async function deleteTask(id) {
+    await persist(tasks.filter((t) => t.id !== id), shopping);
   }
 
-  async function deleteTask(id) {
-    await persist(tasks.filter((t) => t.id !== id));
+  // ---------- Einkaufsliste ----------
+  async function addShoppingItem(e) {
+    e.preventDefault();
+    const input = document.getElementById("newShopItem");
+    const text = input.value.trim();
+    if (!text) return;
+    const item = { id: uid(), text, createdAt: Date.now() };
+    await persist(tasks, [item, ...shopping]);
+    input.value = "";
+  }
+  async function boughtItem(id) {
+    await persist(tasks, shopping.filter((s) => s.id !== id));
   }
 
   function countFor(cat) {
-    return cat === "erledigt" ? tasks.filter((t) => t.status === "done").length : tasks.filter((t) => t.category === cat && t.status === "active").length;
+    if (cat === "erledigt") return tasks.filter((t) => t.status === "done").length;
+    if (cat === "shopping") return shopping.length;
+    return tasks.filter((t) => t.category === cat && t.status === "active").length;
+  }
+
+  // ---------- Rendering ----------
+  function renderApp() {
+    const root = document.getElementById("root");
+    const dotClass = connStatus === "ok" ? "ok" : connStatus === "err" ? "err" : "wait";
+    const dotText = connStatus === "ok" ? "verbunden" : connStatus === "err" ? "keine Verbindung" : "verbinde…";
+
+    root.innerHTML = `
+      <div class="wrap">
+        <header>
+          <div>
+            <h1>Haushaltsplan</h1>
+            <p class="sub"><span class="dot ${dotClass}"></span>${dotText}</p>
+          </div>
+          <div style="display:flex; gap:14px;">
+            <button class="icon-btn" id="settingsLink">⚙ Einstellungen</button>
+            <button class="icon-btn" id="resetLink">↺ Zurücksetzen</button>
+          </div>
+        </header>
+        <div id="confirmBar" class="confirm-bar" style="display:none;">
+          <span>Wirklich alle Aufgaben &amp; die Einkaufsliste unwiderruflich löschen?</span>
+          <div class="btns">
+            <button class="danger" id="confirmYes">Ja, löschen</button>
+            <button class="plain" id="confirmNo">Abbrechen</button>
+          </div>
+        </div>
+        <nav id="tabs"></nav>
+        <div id="formSlot"></div>
+        <div id="content"></div>
+      </div>`;
+
+    document.getElementById("settingsLink").onclick = renderSetupScreen;
+    document.getElementById("resetLink").onclick = () => document.getElementById("confirmBar").style.display = "flex";
+    document.getElementById("confirmNo").onclick = () => document.getElementById("confirmBar").style.display = "none";
+    document.getElementById("confirmYes").onclick = async () => {
+      document.getElementById("confirmBar").style.display = "none";
+      await persist([], []);
+    };
+
+    renderTabs();
+    renderForm();
+    renderContent();
   }
 
   function renderTabs() {
-    const tabs = ["weekly", "monthly", "once", "erledigt"];
+    const tabs = ["weekly", "monthly", "once", "erledigt", "shopping"];
     const nav = document.getElementById("tabs");
     nav.innerHTML = "";
     tabs.forEach((tab) => {
       const meta = CATEGORIES[tab];
+      const label = tab === "erledigt" ? "Erledigt" : tab === "shopping" ? "Einkaufsliste" : meta.label;
+      const accent = tab === "erledigt" ? "#26362B" : tab === "shopping" ? "var(--shopping)" : meta.accent;
       const btn = document.createElement("button");
       btn.className = activeTab === tab ? "active" : "";
-      btn.style.background = activeTab === tab ? (meta ? meta.accent : "#26362B") : "#fff";
+      btn.style.background = activeTab === tab ? accent : "#fff";
       btn.style.color = activeTab === tab ? "#fff" : "#4A5A4D";
-      btn.innerHTML = `${tab === "erledigt" ? "Erledigt" : meta.label} <span class="count">${countFor(tab)}</span>`;
-      btn.onclick = () => { activeTab = tab; render(); };
+      btn.innerHTML = `${label} <span class="count">${countFor(tab)}</span>`;
+      btn.onclick = () => { activeTab = tab; renderApp(); };
       nav.appendChild(btn);
     });
-    document.getElementById("addForm").style.display = activeTab === "erledigt" ? "none" : "flex";
-    if (activeTab !== "erledigt") {
-      const meta = CATEGORIES[activeTab];
-      document.getElementById("newTitle").placeholder = `Neue ${meta.label.toLowerCase()}e Aufgabe…`;
-      const btn = document.querySelector("form.add button");
-      btn.style.background = meta.accent;
+  }
+
+  function renderForm() {
+    const slot = document.getElementById("formSlot");
+    if (activeTab === "erledigt") { slot.innerHTML = ""; return; }
+    if (activeTab === "shopping") {
+      slot.innerHTML = `<form class="add" id="shopForm">
+        <input id="newShopItem" type="text" placeholder="Was braucht ihr?" autocomplete="off" />
+        <button type="submit" style="background:var(--shopping)">+ Hinzufügen</button>
+      </form>`;
+      document.getElementById("shopForm").addEventListener("submit", addShoppingItem);
+      return;
     }
+    const meta = CATEGORIES[activeTab];
+    slot.innerHTML = `<form class="add" id="addForm">
+      <input id="newTitle" type="text" placeholder="Neue ${meta.label.toLowerCase()}e Aufgabe…" autocomplete="off" />
+      <button type="submit" style="background:${meta.accent}">+ Anlegen</button>
+    </form>`;
+    document.getElementById("addForm").addEventListener("submit", addTask);
   }
 
   function renderContent() {
     const el = document.getElementById("content");
+
+    if (activeTab === "shopping") {
+      if (shopping.length === 0) {
+        el.innerHTML = `<div class="empty">Einkaufsliste ist leer. Trag ein, was ihr braucht.</div>`;
+        return;
+      }
+      const list = document.createElement("div");
+      list.className = "shop-list";
+      [...shopping].sort((a, b) => b.createdAt - a.createdAt).forEach((s) => {
+        const row = document.createElement("div");
+        row.className = "shop-row";
+        row.innerHTML = `<span>${escapeHtml(s.text)}</span><button data-bought="${s.id}">✓ gekauft</button>`;
+        list.appendChild(row);
+      });
+      el.innerHTML = "";
+      el.appendChild(list);
+      list.querySelectorAll("[data-bought]").forEach((b) => b.onclick = () => boughtItem(b.dataset.bought));
+      return;
+    }
+
     const visible = activeTab === "erledigt"
       ? tasks.filter((t) => t.status === "done").sort((a, b) => b.doneAt - a.doneAt)
       : tasks.filter((t) => t.category === activeTab && t.status === "active").sort((a, b) => b.createdAt - a.createdAt);
@@ -259,7 +327,6 @@
       tile.style.transform = `rotate(${rotate})`;
 
       let inner = `<div class="tile-top"><p class="tile-title">${escapeHtml(t.title)}</p><button class="del-btn" data-del="${t.id}">🗑</button></div>`;
-
       if (activeTab === "erledigt") {
         inner += `<div class="done-meta"><span><span class="avatar" style="background:${PEOPLE[t.doneBy]}">${t.doneBy?.[0] || ""}</span>${t.doneBy} · ${formatDate(t.doneAt)}</span>`;
         if (t.category !== "once") inner += `<span class="note" style="color:${meta.accent}">${meta.note}</span>`;
@@ -267,7 +334,7 @@
       } else {
         inner += `<div class="mark-row">`;
         Object.keys(PEOPLE).forEach((person) => {
-          inner += `<button data-done="${t.id}" data-person="${person}" style="border:1px solid ${PEOPLE[person]};color:${PEOPLE[person]}" onmouseenter="this.style.background='${PEOPLE[person]}';this.style.color='#fff'" onmouseleave="this.style.background='transparent';this.style.color='${PEOPLE[person]}'">✓ ${person}</button>`;
+          inner += `<button data-done="${t.id}" data-person="${person}" style="border:1px solid ${PEOPLE[person]};color:${PEOPLE[person]}">✓ ${person}</button>`;
         });
         inner += `</div>`;
       }
@@ -276,50 +343,91 @@
     });
     el.innerHTML = "";
     el.appendChild(grid);
-
     grid.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => deleteTask(b.dataset.del));
     grid.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => markDone(b.dataset.done, b.dataset.person));
   }
 
-  function escapeHtml(s) {
-    const d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
+  // ---------- Setup-Bildschirm ----------
+  function renderSetupScreen(prefillError) {
+    const root = document.getElementById("root");
+    const existing = localStorage.getItem(LS_KEY) || "";
+    root.innerHTML = `
+      <div class="setup">
+        <h2>Mit Firebase verbinden</h2>
+        <p>Damit du &amp; Sarah dieselben Aufgaben seht, braucht die App eine kostenlose Firebase-Datenbank.</p>
+        <ol>
+          <li>Auf <b>console.firebase.google.com</b> mit einem Google-Konto anmelden</li>
+          <li>„Projekt hinzufügen" → Namen vergeben, Analytics kann aus bleiben</li>
+          <li>Links „Firestore Database" → „Datenbank erstellen" → <b>Testmodus</b></li>
+          <li>Oben Web-Symbol <code>&lt;/&gt;</code> klicken, App registrieren</li>
+          <li>Den angezeigten <code>firebaseConfig</code>-Codeblock hier unten einfügen</li>
+        </ol>
+        <textarea id="cfgInput" placeholder='{ apiKey: "...", authDomain: "...", projectId: "...", ... }'>${existing ? JSON.stringify(JSON.parse(existing), null, 2) : ""}</textarea>
+        <div>
+          <button class="save" id="saveCfg">Speichern &amp; verbinden</button>
+          ${existing ? `<button class="plain" id="backBtn" style="margin-left:8px;border:1px solid var(--border);background:#fff;border-radius:10px;padding:11px 16px;cursor:pointer;">Zurück</button>` : ""}
+        </div>
+        ${prefillError ? `<p class="err">${prefillError}</p>` : ""}
+      </div>`;
+
+    if (existing) {
+      document.getElementById("backBtn").onclick = renderApp;
+    }
+    document.getElementById("saveCfg").onclick = () => {
+      const raw = document.getElementById("cfgInput").value.trim();
+      try {
+        const parsed = new Function("return (" + raw + ")")();
+        if (!parsed || !parsed.apiKey || !parsed.projectId) throw new Error("unvollständig");
+        localStorage.setItem(LS_KEY, JSON.stringify(parsed));
+        connectFirebase(parsed);
+      } catch (e) {
+        renderSetupScreen("Konnte den Codeblock nicht lesen. Bitte den kompletten Block genau so einfügen, wie Firebase ihn anzeigt.");
+      }
+    };
   }
 
-  function render() {
-    renderTabs();
-    renderContent();
+  // ---------- Firebase-Verbindung ----------
+  function connectFirebase(cfg) {
+    root_loading();
+    try {
+      const app = initializeApp(cfg);
+      db = getFirestore(app);
+      docRef = doc(db, "household", "tasks");
+      onSnapshot(docRef, (snap) => {
+        connStatus = "ok";
+        const data = snap.exists() ? snap.data() : {};
+        const { next, changed } = applyResets(data.list || []);
+        tasks = next;
+        shopping = data.shopping || [];
+        renderApp();
+        if (changed) setDoc(docRef, { list: next, shopping });
+      }, (err) => {
+        console.error(err);
+        connStatus = "err";
+        renderApp();
+        showToast("Verbindung fehlgeschlagen — Zugangsdaten oder Firestore-Regeln prüfen");
+      });
+    } catch (e) {
+      console.error(e);
+      renderSetupScreen("Zugangsdaten scheinen ungültig. Bitte nochmal prüfen.");
+    }
   }
 
-  document.getElementById("addForm").addEventListener("submit", addTask);
-  document.getElementById("resetLink").onclick = () => document.getElementById("confirmBar").style.display = "flex";
-  document.getElementById("confirmNo").onclick = () => document.getElementById("confirmBar").style.display = "none";
-  document.getElementById("confirmYes").onclick = async () => {
-    document.getElementById("confirmBar").style.display = "none";
-    await persist([]);
-  };
+  function root_loading() {
+    document.getElementById("root").innerHTML = `<div class="wrap"><p class="loading">Verbinde…</p></div>`;
+  }
 
-  // --- Firebase-Verbindung ---
-  if (CONFIG_MISSING) {
-    document.getElementById("content").innerHTML = `<div class="config-warning">
-      ⚠️ Noch nicht verbunden: Trag oben im Code (<code>firebaseConfig</code>) deine Firebase-Zugangsdaten ein, damit die Aufgaben zwischen euch geteilt gespeichert werden.
-    </div>`;
-    render();
+  // ---------- Start ----------
+  const saved = localStorage.getItem(LS_KEY);
+  if (saved) {
+    try { connectFirebase(JSON.parse(saved)); }
+    catch (e) { renderSetupScreen(); }
   } else {
-    const app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    docRef = doc(db, "household", "tasks");
-    onSnapshot(docRef, (snap) => {
-      const list = snap.exists() ? (snap.data().list || []) : [];
-      const { next, changed } = applyResets(list);
-      tasks = next;
-      render();
-      if (changed) setDoc(docRef, { list: next });
-    }, (err) => {
-      console.error(err);
-      document.getElementById("content").innerHTML = `<div class="config-warning">⚠️ Verbindung zur Datenbank fehlgeschlagen. Prüf die Firebase-Zugangsdaten und die Firestore-Regeln.</div>`;
-    });
+    renderSetupScreen();
+  }
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js").catch(() => {}));
   }
 </script>
 </body>
