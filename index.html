@@ -229,28 +229,14 @@
           </div>
           <div style="display:flex; gap:14px;">
             <button class="icon-btn" id="settingsLink">⚙ Einstellungen</button>
-            <button class="icon-btn" id="resetLink">↺ Zurücksetzen</button>
           </div>
         </header>
-        <div id="confirmBar" class="confirm-bar" style="display:none;">
-          <span>Wirklich alle Aufgaben &amp; die Einkaufsliste unwiderruflich löschen?</span>
-          <div class="btns">
-            <button class="danger" id="confirmYes">Ja, löschen</button>
-            <button class="plain" id="confirmNo">Abbrechen</button>
-          </div>
-        </div>
         <nav id="tabs"></nav>
         <div id="formSlot"></div>
         <div id="content"></div>
       </div>`;
 
     document.getElementById("settingsLink").onclick = renderSetupScreen;
-    document.getElementById("resetLink").onclick = () => document.getElementById("confirmBar").style.display = "flex";
-    document.getElementById("confirmNo").onclick = () => document.getElementById("confirmBar").style.display = "none";
-    document.getElementById("confirmYes").onclick = async () => {
-      document.getElementById("confirmBar").style.display = "none";
-      await persist([], []);
-    };
 
     renderTabs();
     renderForm();
@@ -357,42 +343,38 @@
     grid.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => markDone(b.dataset.done, b.dataset.person));
   }
 
-  // ---------- Setup-Bildschirm ----------
-  function renderSetupScreen(prefillError) {
+  // ---------- Einstellungen ----------
+  function renderSetupScreen() {
     const root = document.getElementById("root");
-    const existing = localStorage.getItem(LS_KEY) || "";
     root.innerHTML = `
       <div class="setup">
-        <h2>Mit Firebase verbinden</h2>
-        <p>Damit du &amp; Sarah dieselben Aufgaben seht, braucht die App eine kostenlose Firebase-Datenbank.</p>
-        <ol>
-          <li>Auf <b>console.firebase.google.com</b> mit einem Google-Konto anmelden</li>
-          <li>„Projekt hinzufügen" → Namen vergeben, Analytics kann aus bleiben</li>
-          <li>Links „Firestore Database" → „Datenbank erstellen" → <b>Testmodus</b></li>
-          <li>Oben Web-Symbol <code>&lt;/&gt;</code> klicken, App registrieren</li>
-          <li>Den angezeigten <code>firebaseConfig</code>-Codeblock hier unten einfügen</li>
-        </ol>
-        <textarea id="cfgInput" placeholder='{ apiKey: "...", authDomain: "...", projectId: "...", ... }'>${existing ? JSON.stringify(JSON.parse(existing), null, 2) : ""}</textarea>
-        <div>
-          <button class="save" id="saveCfg">Speichern &amp; verbinden</button>
-          ${existing ? `<button class="plain" id="backBtn" style="margin-left:8px;border:1px solid var(--border);background:#fff;border-radius:10px;padding:11px 16px;cursor:pointer;">Zurück</button>` : ""}
+        <h2>Einstellungen</h2>
+        <p>Verbunden mit Firebase-Projekt <b>${FIREBASE_CONFIG.projectId}</b>.</p>
+        <button class="plain" id="backBtn" style="border:1px solid var(--border);background:#fff;border-radius:10px;padding:11px 16px;cursor:pointer;margin-top:6px;">← Zurück</button>
+
+        <div style="margin-top:36px; border-top:1px solid var(--border); padding-top:20px;">
+          <h2 style="color:#B15D6C; font-size:17px;">Gefahrenzone</h2>
+          <p>Löscht <b>alle</b> Aufgaben und die Einkaufsliste unwiderruflich, für dich und Sarah. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
+          <input id="resetConfirmInput" type="text" placeholder="LÖSCHEN eintippen" style="width:100%; border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:14px; font-family:inherit; margin-top:6px;" />
+          <button id="doResetBtn" disabled style="background:#C9A9AC; color:#fff; border:none; border-radius:10px; padding:11px 18px; font-size:14px; margin-top:12px; cursor:not-allowed;">Endgültig alles löschen</button>
         </div>
-        ${prefillError ? `<p class="err">${prefillError}</p>` : ""}
       </div>`;
 
-    if (existing) {
-      document.getElementById("backBtn").onclick = renderApp;
-    }
-    document.getElementById("saveCfg").onclick = () => {
-      const raw = document.getElementById("cfgInput").value.trim();
-      try {
-        const parsed = new Function("return (" + raw + ")")();
-        if (!parsed || !parsed.apiKey || !parsed.projectId) throw new Error("unvollständig");
-        localStorage.setItem(LS_KEY, JSON.stringify(parsed));
-        connectFirebase(parsed);
-      } catch (e) {
-        renderSetupScreen("Konnte den Codeblock nicht lesen. Bitte den kompletten Block genau so einfügen, wie Firebase ihn anzeigt.");
-      }
+    document.getElementById("backBtn").onclick = renderApp;
+
+    const input = document.getElementById("resetConfirmInput");
+    const btn = document.getElementById("doResetBtn");
+    input.addEventListener("input", () => {
+      const ready = input.value.trim() === "LÖSCHEN";
+      btn.disabled = !ready;
+      btn.style.background = ready ? "#B15D6C" : "#C9A9AC";
+      btn.style.cursor = ready ? "pointer" : "not-allowed";
+    });
+    btn.onclick = async () => {
+      if (input.value.trim() !== "LÖSCHEN") return;
+      await persist([], []);
+      showToast("Alles gelöscht");
+      renderApp();
     };
   }
 
