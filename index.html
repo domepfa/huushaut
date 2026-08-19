@@ -177,7 +177,7 @@
     } catch (e) {
       console.error(e);
       saveError = e && e.code === "permission-denied"
-        ? "Speichern blockiert: Firestore-Regeln erlauben kein Schreiben. In der Firebase-Konsole unter „Firestore Database → Regeln" prüfen und veröffentlichen."
+        ? "Speichern blockiert: Firestore-Regeln erlauben kein Schreiben. In der Firebase-Konsole unter 'Firestore Database → Regeln' prüfen und veröffentlichen."
         : "Speichern fehlgeschlagen. Änderungen sind nur lokal auf diesem Gerät gespeichert und gehen beim Schließen evtl. verloren, bis die Verbindung wieder da ist.";
       renderApp();
     }
