@@ -88,6 +88,7 @@
   };
   const PEOPLE = { Ich: "#2F6D5C", Sarah: "#C9587A" };
   const LS_KEY = "haushaltsplan-firebase-config";
+  const LS_DATA_KEY = "haushaltsplan-data-cache";
 
   // Fest eingebaute Firebase-Zugangsdaten für Huushaut
   const FIREBASE_CONFIG = {
@@ -159,6 +160,7 @@
     tasks = nextTasks;
     shopping = nextShopping;
     renderApp();
+    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: nextTasks, shopping: nextShopping })); } catch (e) {}
     if (!db) return;
     try {
       await setDoc(docRef, { list: nextTasks, shopping: nextShopping });
@@ -380,7 +382,6 @@
 
   // ---------- Firebase-Verbindung ----------
   function connectFirebase(cfg) {
-    root_loading();
     try {
       const app = initializeApp(cfg);
       db = getFirestore(app);
@@ -392,6 +393,7 @@
         tasks = next;
         shopping = data.shopping || [];
         renderApp();
+        try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: tasks, shopping })); } catch (e) {}
         if (changed) setDoc(docRef, { list: next, shopping });
       }, (err) => {
         console.error(err);
@@ -405,11 +407,19 @@
     }
   }
 
-  function root_loading() {
-    document.getElementById("root").innerHTML = `<div class="wrap"><p class="loading">Verbinde…</p></div>`;
-  }
-
   // ---------- Start ----------
+  // Zuletzt gespeicherten Stand sofort anzeigen, damit die App nicht auf die
+  // Live-Verbindung warten muss — im Hintergrund wird dann synchronisiert.
+  try {
+    const cached = localStorage.getItem(LS_DATA_KEY);
+    if (cached) {
+      const data = JSON.parse(cached);
+      const { next } = applyResets(data.list || []);
+      tasks = next;
+      shopping = data.shopping || [];
+    }
+  } catch (e) {}
+  renderApp();
   connectFirebase(FIREBASE_CONFIG);
 
   if ("serviceWorker" in navigator) {
