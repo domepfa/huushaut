@@ -1,4 +1,4 @@
-const CACHE = "haushaltsplan-v4";
+const CACHE = "haushaltsplan-v5";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
