@@ -59,9 +59,11 @@
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 14px; padding: 10px 16px; border-radius: 999px; display: flex; align-items: center; gap: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); z-index: 20; }
   .toast button { background: none; border: none; color: #fff; cursor: pointer; opacity: 0.7; }
   .shop-list { display: flex; flex-direction: column; gap: 8px; }
-  .shop-row { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .shop-row { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; position: relative; touch-action: pan-y; }
   .shop-row span { font-size: 14px; }
   .shop-row button { background: #fff; border: 1px solid var(--shopping); color: var(--shopping); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .drag-handle { background: none; border: none; color: #9AA79C; font-size: 19px; padding: 2px 4px; line-height: 1; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; flex-shrink: 0; }
+  .shop-row.dragging-row { z-index: 20; box-shadow: 0 8px 22px rgba(0,0,0,0.16); background: #fff; }
 
   /* --- Setup-Bildschirm --- */
   .setup { max-width: 480px; margin: 60px auto; padding: 0 20px; }
@@ -80,7 +82,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { initializeFirestore, getFirestore, persistentLocalCache, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const CATEGORIES = {
     weekly: { label: "Wöchentlich", accent: "#C98A2C", note: "Kehrt am Montag zurück" },
@@ -252,6 +254,65 @@
     await persist(tasks, next, notes);
   }
 
+  // ---------- Einkaufsliste: Ziehen zum Sortieren ----------
+  let dragState = null;
+  function shoppingDragStart(id, e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    const list = document.getElementById("shopList");
+    if (!list) return;
+    const rows = Array.from(list.children);
+    const startIndex = shopping.findIndex((s) => s.id === id);
+    if (startIndex === -1) return;
+    const rowEl = rows[startIndex];
+    const rect = rowEl.getBoundingClientRect();
+    const gap = parseFloat(getComputedStyle(list).rowGap || "8") || 8;
+    dragState = { id, startIndex, hoverIndex: startIndex, startY: e.clientY, rowHeight: rect.height + gap, rowEl, rows };
+    rowEl.classList.add("dragging-row");
+    rowEl.style.transition = "none";
+    try { rowEl.setPointerCapture(e.pointerId); } catch (err) {}
+    rowEl.addEventListener("pointermove", shoppingDragMove);
+    rowEl.addEventListener("pointerup", shoppingDragEnd);
+    rowEl.addEventListener("pointercancel", shoppingDragEnd);
+  }
+  function shoppingDragMove(e) {
+    if (!dragState) return;
+    const deltaY = e.clientY - dragState.startY;
+    dragState.rowEl.style.transform = `translateY(${deltaY}px)`;
+    const rawIndex = dragState.startIndex + Math.round(deltaY / dragState.rowHeight);
+    const newHoverIndex = Math.max(0, Math.min(dragState.rows.length - 1, rawIndex));
+    if (newHoverIndex !== dragState.hoverIndex) {
+      const lo = Math.min(dragState.hoverIndex, newHoverIndex, dragState.startIndex);
+      const hi = Math.max(dragState.hoverIndex, newHoverIndex, dragState.startIndex);
+      for (let i = lo; i <= hi; i++) {
+        if (i === dragState.startIndex) continue;
+        const el = dragState.rows[i];
+        if (!el) continue;
+        const shiftUp = i > dragState.startIndex && i <= newHoverIndex;
+        const shiftDown = i < dragState.startIndex && i >= newHoverIndex;
+        el.style.transition = "transform .15s";
+        el.style.transform = shiftUp ? `translateY(-${dragState.rowHeight}px)` : shiftDown ? `translateY(${dragState.rowHeight}px)` : "";
+      }
+      dragState.hoverIndex = newHoverIndex;
+    }
+  }
+  function shoppingDragEnd(e) {
+    if (!dragState) return;
+    const { id, startIndex, hoverIndex, rowEl } = dragState;
+    rowEl.removeEventListener("pointermove", shoppingDragMove);
+    rowEl.removeEventListener("pointerup", shoppingDragEnd);
+    rowEl.removeEventListener("pointercancel", shoppingDragEnd);
+    dragState = null;
+    if (hoverIndex !== startIndex) {
+      const next = [...shopping];
+      const [moved] = next.splice(startIndex, 1);
+      next.splice(hoverIndex, 0, moved);
+      persist(tasks, next, notes);
+    } else {
+      renderContent();
+    }
+  }
+
   // ---------- Notizen ----------
   async function addNote(e) {
     e.preventDefault();
@@ -360,14 +421,13 @@
       }
       const list = document.createElement("div");
       list.className = "shop-list";
-      shopping.forEach((s, i) => {
+      list.id = "shopList";
+      shopping.forEach((s) => {
         const row = document.createElement("div");
         row.className = "shop-row";
+        row.dataset.shopid = s.id;
         row.innerHTML = `
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <button data-up="${s.id}" ${i === 0 ? "disabled" : ""} style="background:none;border:none;color:${i === 0 ? "#D8DED2" : "#5C6E5F"};cursor:${i === 0 ? "default" : "pointer"};padding:0;line-height:1;font-size:13px;">▲</button>
-            <button data-down="${s.id}" ${i === shopping.length - 1 ? "disabled" : ""} style="background:none;border:none;color:${i === shopping.length - 1 ? "#D8DED2" : "#5C6E5F"};cursor:${i === shopping.length - 1 ? "default" : "pointer"};padding:0;line-height:1;font-size:13px;">▼</button>
-          </div>
+          <button class="drag-handle" data-drag="${s.id}" aria-label="Verschieben">⠿</button>
           <span style="flex:1;">${escapeHtml(s.text)}</span>
           <button data-bought="${s.id}">✓ gekauft</button>`;
         list.appendChild(row);
@@ -375,8 +435,7 @@
       el.innerHTML = "";
       el.appendChild(list);
       list.querySelectorAll("[data-bought]").forEach((b) => b.onclick = () => boughtItem(b.dataset.bought));
-      list.querySelectorAll("[data-up]:not([disabled])").forEach((b) => b.onclick = () => moveShoppingItem(b.dataset.up, -1));
-      list.querySelectorAll("[data-down]:not([disabled])").forEach((b) => b.onclick = () => moveShoppingItem(b.dataset.down, 1));
+      list.querySelectorAll("[data-drag]").forEach((h) => h.addEventListener("pointerdown", (e) => shoppingDragStart(h.dataset.drag, e)));
       return;
     }
 
@@ -479,7 +538,12 @@
   function connectFirebase(cfg) {
     try {
       const app = initializeApp(cfg);
-      db = getFirestore(app);
+      try {
+        db = initializeFirestore(app, { localCache: persistentLocalCache() });
+      } catch (e) {
+        console.warn("Offline-Speicher nicht verfügbar, nutze Standard-Verbindung", e);
+        db = getFirestore(app);
+      }
       docRef = doc(db, "household", "tasks");
       onSnapshot(docRef, (snap) => {
         connStatus = "ok";
