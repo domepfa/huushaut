@@ -76,6 +76,7 @@
 <body>
 <div id="root"><div class="wrap"><p class="loading">Lädt…</p></div></div>
 <div id="toastWrap"></div>
+<div id="confirmOverlay"></div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -86,7 +87,7 @@
     monthly: { label: "Monatlich", accent: "#4A7A93", note: "Kehrt am 1. zurück" },
     once: { label: "Einmalig", accent: "#B15D6C", note: "Verschwindet endgültig" },
   };
-  const PEOPLE = { Ich: "#2F6D5C", Sarah: "#C9587A" };
+  const PEOPLE = { Dome: "#2F6D5C", Sarah: "#C9587A" };
   const LS_KEY = "haushaltsplan-firebase-config";
   const LS_DATA_KEY = "haushaltsplan-data-cache";
 
@@ -102,6 +103,7 @@
 
   let tasks = [];
   let shopping = [];
+  let notes = [];
   let activeTab = "weekly";
   let db = null;
   let docRef = null;
@@ -148,6 +150,21 @@
     document.getElementById("toastClose").onclick = () => (wrap.innerHTML = "");
     setTimeout(() => (wrap.innerHTML = ""), 2200);
   }
+  function askConfirm(message, onYes) {
+    const wrap = document.getElementById("confirmOverlay");
+    wrap.innerHTML = `
+      <div style="position:fixed;inset:0;background:rgba(38,54,43,0.4);display:flex;align-items:center;justify-content:center;z-index:30;padding:20px;">
+        <div style="background:#fff;border-radius:14px;padding:20px;max-width:340px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+          <p style="font-size:14px;margin:0 0 16px;line-height:1.5;">${escapeHtml(message)}</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="confirmNoBtn" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">Nein</button>
+            <button id="confirmYesBtn" style="background:var(--once);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">Ja, löschen</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("confirmNoBtn").onclick = () => (wrap.innerHTML = "");
+    document.getElementById("confirmYesBtn").onclick = () => { wrap.innerHTML = ""; onYes(); };
+  }
 
   function applyResets(list) {
     const now = new Date();
@@ -165,14 +182,15 @@
     return { next, changed };
   }
 
-  async function persist(nextTasks, nextShopping) {
+  async function persist(nextTasks, nextShopping, nextNotes) {
     tasks = nextTasks;
     shopping = nextShopping;
+    notes = nextNotes;
     renderApp();
-    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: nextTasks, shopping: nextShopping })); } catch (e) {}
+    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: nextTasks, shopping: nextShopping, notes: nextNotes })); } catch (e) {}
     if (!db) return;
     try {
-      await setDoc(docRef, { list: nextTasks, shopping: nextShopping });
+      await setDoc(docRef, { list: nextTasks, shopping: nextShopping, notes: nextNotes });
       if (saveError) { saveError = null; renderApp(); }
     } catch (e) {
       console.error(e);
@@ -190,7 +208,7 @@
     const title = input.value.trim();
     if (!title) return;
     const task = { id: uid(), title, category: activeTab, status: "active", createdAt: Date.now(), doneBy: null, doneAt: null, periodKey: null };
-    await persist([task, ...tasks], shopping);
+    await persist([task, ...tasks], shopping, notes);
     focusInput("newTitle");
   }
   async function markDone(id, person) {
@@ -198,15 +216,18 @@
     if (!task) return;
     if (task.category === "once") {
       showToast(`„${task.title}" erledigt von ${person}`);
-      await persist(tasks.filter((t) => t.id !== id), shopping);
+      await persist(tasks.filter((t) => t.id !== id), shopping, notes);
       return;
     }
     const now = new Date();
     const next = tasks.map((t) => t.id === id ? { ...t, status: "done", doneBy: person, doneAt: Date.now(), periodKey: currentPeriodKey(t.category, now) } : t);
-    await persist(next, shopping);
+    await persist(next, shopping, notes);
   }
-  async function deleteTask(id) {
-    await persist(tasks.filter((t) => t.id !== id), shopping);
+  function deleteTask(id) {
+    const task = tasks.find((t) => t.id === id);
+    askConfirm(`„${task ? task.title : "Aufgabe"}" wirklich löschen?`, async () => {
+      await persist(tasks.filter((t) => t.id !== id), shopping, notes);
+    });
   }
 
   // ---------- Einkaufsliste ----------
@@ -216,16 +237,41 @@
     const text = input.value.trim();
     if (!text) return;
     const item = { id: uid(), text, createdAt: Date.now() };
-    await persist(tasks, [item, ...shopping]);
+    await persist(tasks, [item, ...shopping], notes);
     focusInput("newShopItem");
   }
   async function boughtItem(id) {
-    await persist(tasks, shopping.filter((s) => s.id !== id));
+    await persist(tasks, shopping.filter((s) => s.id !== id), notes);
+  }
+  async function moveShoppingItem(id, dir) {
+    const idx = shopping.findIndex((s) => s.id === id);
+    const swapIdx = idx + dir;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= shopping.length) return;
+    const next = [...shopping];
+    [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+    await persist(tasks, next, notes);
+  }
+
+  // ---------- Notizen ----------
+  async function addNote(e) {
+    e.preventDefault();
+    const input = document.getElementById("newNote");
+    const text = input.value.trim();
+    if (!text) return;
+    const note = { id: uid(), text, createdAt: Date.now() };
+    await persist(tasks, shopping, [note, ...notes]);
+    focusInput("newNote");
+  }
+  function deleteNote(id) {
+    askConfirm("Notiz wirklich löschen?", async () => {
+      await persist(tasks, shopping, notes.filter((n) => n.id !== id));
+    });
   }
 
   function countFor(cat) {
     if (cat === "erledigt") return tasks.filter((t) => t.status === "done").length;
     if (cat === "shopping") return shopping.length;
+    if (cat === "notes") return notes.length;
     return tasks.filter((t) => t.category === cat && t.status === "active").length;
   }
 
@@ -260,13 +306,13 @@
   }
 
   function renderTabs() {
-    const tabs = ["weekly", "monthly", "once", "erledigt", "shopping"];
+    const tabs = ["weekly", "monthly", "once", "erledigt", "shopping", "notes"];
     const nav = document.getElementById("tabs");
     nav.innerHTML = "";
     tabs.forEach((tab) => {
       const meta = CATEGORIES[tab];
-      const label = tab === "erledigt" ? "Erledigt" : tab === "shopping" ? "Einkaufsliste" : meta.label;
-      const accent = tab === "erledigt" ? "#26362B" : tab === "shopping" ? "var(--shopping)" : meta.accent;
+      const label = tab === "erledigt" ? "Erledigt" : tab === "shopping" ? "Einkaufsliste" : tab === "notes" ? "Notizen" : meta.label;
+      const accent = tab === "erledigt" ? "#26362B" : tab === "shopping" ? "var(--shopping)" : tab === "notes" ? "#7A6FA6" : meta.accent;
       const btn = document.createElement("button");
       btn.className = activeTab === tab ? "active" : "";
       btn.style.background = activeTab === tab ? accent : "#fff";
@@ -288,6 +334,14 @@
       document.getElementById("shopForm").addEventListener("submit", addShoppingItem);
       return;
     }
+    if (activeTab === "notes") {
+      slot.innerHTML = `<form class="add" id="noteForm">
+        <input id="newNote" type="text" placeholder="Notiz schreiben…" autocomplete="off" />
+        <button type="submit" style="background:#7A6FA6">+ Notiz</button>
+      </form>`;
+      document.getElementById("noteForm").addEventListener("submit", addNote);
+      return;
+    }
     const meta = CATEGORIES[activeTab];
     slot.innerHTML = `<form class="add" id="addForm">
       <input id="newTitle" type="text" placeholder="Neue ${meta.label.toLowerCase()}e Aufgabe…" autocomplete="off" />
@@ -306,15 +360,42 @@
       }
       const list = document.createElement("div");
       list.className = "shop-list";
-      [...shopping].sort((a, b) => b.createdAt - a.createdAt).forEach((s) => {
+      shopping.forEach((s, i) => {
         const row = document.createElement("div");
         row.className = "shop-row";
-        row.innerHTML = `<span>${escapeHtml(s.text)}</span><button data-bought="${s.id}">✓ gekauft</button>`;
+        row.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <button data-up="${s.id}" ${i === 0 ? "disabled" : ""} style="background:none;border:none;color:${i === 0 ? "#D8DED2" : "#5C6E5F"};cursor:${i === 0 ? "default" : "pointer"};padding:0;line-height:1;font-size:13px;">▲</button>
+            <button data-down="${s.id}" ${i === shopping.length - 1 ? "disabled" : ""} style="background:none;border:none;color:${i === shopping.length - 1 ? "#D8DED2" : "#5C6E5F"};cursor:${i === shopping.length - 1 ? "default" : "pointer"};padding:0;line-height:1;font-size:13px;">▼</button>
+          </div>
+          <span style="flex:1;">${escapeHtml(s.text)}</span>
+          <button data-bought="${s.id}">✓ gekauft</button>`;
         list.appendChild(row);
       });
       el.innerHTML = "";
       el.appendChild(list);
       list.querySelectorAll("[data-bought]").forEach((b) => b.onclick = () => boughtItem(b.dataset.bought));
+      list.querySelectorAll("[data-up]:not([disabled])").forEach((b) => b.onclick = () => moveShoppingItem(b.dataset.up, -1));
+      list.querySelectorAll("[data-down]:not([disabled])").forEach((b) => b.onclick = () => moveShoppingItem(b.dataset.down, 1));
+      return;
+    }
+
+    if (activeTab === "notes") {
+      if (notes.length === 0) {
+        el.innerHTML = `<div class="empty">Noch keine Notizen. Schreib was rein.</div>`;
+        return;
+      }
+      const list = document.createElement("div");
+      list.className = "shop-list";
+      [...notes].sort((a, b) => b.createdAt - a.createdAt).forEach((n) => {
+        const row = document.createElement("div");
+        row.className = "shop-row";
+        row.innerHTML = `<span style="flex:1;white-space:pre-wrap;">${escapeHtml(n.text)}</span><button class="del-btn" data-delnote="${n.id}">🗑</button>`;
+        list.appendChild(row);
+      });
+      el.innerHTML = "";
+      el.appendChild(list);
+      list.querySelectorAll("[data-delnote]").forEach((b) => b.onclick = () => deleteNote(b.dataset.delnote));
       return;
     }
 
@@ -370,7 +451,7 @@
 
         <div style="margin-top:36px; border-top:1px solid var(--border); padding-top:20px;">
           <h2 style="color:#B15D6C; font-size:17px;">Gefahrenzone</h2>
-          <p>Löscht <b>alle</b> Aufgaben und die Einkaufsliste unwiderruflich, für dich und Sarah. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
+          <p>Löscht <b>alle</b> Aufgaben, die Einkaufsliste und alle Notizen unwiderruflich, für dich und Sarah. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
           <input id="resetConfirmInput" type="text" placeholder="LÖSCHEN eintippen" style="width:100%; border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:14px; font-family:inherit; margin-top:6px;" />
           <button id="doResetBtn" disabled style="background:#C9A9AC; color:#fff; border:none; border-radius:10px; padding:11px 18px; font-size:14px; margin-top:12px; cursor:not-allowed;">Endgültig alles löschen</button>
         </div>
@@ -388,7 +469,7 @@
     });
     btn.onclick = async () => {
       if (input.value.trim() !== "LÖSCHEN") return;
-      await persist([], []);
+      await persist([], [], []);
       showToast("Alles gelöscht");
       renderApp();
     };
@@ -406,9 +487,10 @@
         const { next, changed } = applyResets(data.list || []);
         tasks = next;
         shopping = data.shopping || [];
+        notes = data.notes || [];
         renderApp();
-        try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: tasks, shopping })); } catch (e) {}
-        if (changed) setDoc(docRef, { list: next, shopping });
+        try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: tasks, shopping, notes })); } catch (e) {}
+        if (changed) setDoc(docRef, { list: next, shopping, notes });
       }, (err) => {
         console.error(err);
         connStatus = "err";
@@ -431,6 +513,7 @@
       const { next } = applyResets(data.list || []);
       tasks = next;
       shopping = data.shopping || [];
+      notes = data.notes || [];
     }
   } catch (e) {}
   renderApp();
