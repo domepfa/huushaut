@@ -64,6 +64,10 @@
   .shop-row button { background: #fff; border: 1px solid var(--shopping); color: var(--shopping); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: 500; white-space: nowrap; }
   .drag-handle { background: none; border: none; color: #9AA79C; font-size: 19px; padding: 2px 4px; line-height: 1; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; flex-shrink: 0; }
   .shop-row.dragging-row { z-index: 20; box-shadow: 0 8px 22px rgba(0,0,0,0.16); background: #fff; }
+  .edit-btn { background: none; border: none; color: #9AA79C; cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0; font-size: 15px; }
+  .edit-btn:hover { color: var(--shopping); }
+  .edit-input { flex: 1; border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit; outline: none; min-width: 0; }
+  .edit-input:focus { box-shadow: 0 0 0 2px #C9D3C0; }
 
   /* --- Setup-Bildschirm --- */
   .setup { max-width: 480px; margin: 60px auto; padding: 0 20px; }
@@ -244,6 +248,22 @@
   }
   async function boughtItem(id) {
     await persist(tasks, shopping.filter((s) => s.id !== id), notes);
+  }
+  let editingShopId = null;
+  function startEditShopping(id) {
+    editingShopId = id;
+    renderContent();
+  }
+  function cancelShoppingEdit() {
+    editingShopId = null;
+    renderContent();
+  }
+  async function saveShoppingEdit(id, rawText) {
+    const text = rawText.trim();
+    editingShopId = null;
+    if (!text) { renderContent(); return; }
+    const next = shopping.map((s) => (s.id === id ? { ...s, text } : s));
+    await persist(tasks, next, notes);
   }
   async function moveShoppingItem(id, dir) {
     const idx = shopping.findIndex((s) => s.id === id);
@@ -426,15 +446,56 @@
         const row = document.createElement("div");
         row.className = "shop-row";
         row.dataset.shopid = s.id;
-        row.innerHTML = `
-          <button class="drag-handle" data-drag="${s.id}" aria-label="Verschieben">⠿</button>
-          <span style="flex:1;">${escapeHtml(s.text)}</span>
-          <button data-bought="${s.id}">✓ gekauft</button>`;
-        list.appendChild(row);
+
+        if (editingShopId === s.id) {
+          row.classList.add("editing-row");
+          const handle = document.createElement("button");
+          handle.className = "drag-handle";
+          handle.setAttribute("aria-label", "Verschieben");
+          handle.textContent = "⠿";
+          handle.disabled = true;
+          handle.style.opacity = "0.3";
+          handle.style.cursor = "default";
+
+          const input = document.createElement("input");
+          input.type = "text";
+          input.className = "edit-input";
+          input.autocomplete = "off";
+          input.value = s.text;
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); saveShoppingEdit(s.id, input.value); }
+            if (e.key === "Escape") { e.preventDefault(); cancelShoppingEdit(); }
+          });
+
+          const saveBtn = document.createElement("button");
+          saveBtn.textContent = "✓ Speichern";
+          saveBtn.onclick = () => saveShoppingEdit(s.id, input.value);
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.className = "del-btn";
+          cancelBtn.setAttribute("aria-label", "Abbrechen");
+          cancelBtn.textContent = "✕";
+          cancelBtn.onclick = () => cancelShoppingEdit();
+
+          row.appendChild(handle);
+          row.appendChild(input);
+          row.appendChild(saveBtn);
+          row.appendChild(cancelBtn);
+          list.appendChild(row);
+          requestAnimationFrame(() => { input.focus(); input.select(); });
+        } else {
+          row.innerHTML = `
+            <button class="drag-handle" data-drag="${s.id}" aria-label="Verschieben">⠿</button>
+            <span style="flex:1;">${escapeHtml(s.text)}</span>
+            <button class="edit-btn" data-edit="${s.id}" aria-label="Bearbeiten">✏️</button>
+            <button data-bought="${s.id}">✓ gekauft</button>`;
+          list.appendChild(row);
+        }
       });
       el.innerHTML = "";
       el.appendChild(list);
       list.querySelectorAll("[data-bought]").forEach((b) => b.onclick = () => boughtItem(b.dataset.bought));
+      list.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => startEditShopping(b.dataset.edit));
       list.querySelectorAll("[data-drag]").forEach((h) => h.addEventListener("pointerdown", (e) => shoppingDragStart(h.dataset.drag, e)));
       return;
     }
