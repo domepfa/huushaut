@@ -140,9 +140,14 @@
   .list-paper li:last-child { border-bottom: none; }
   .list-paper li.dragging-row { background: var(--paper); box-shadow: 0 8px 18px rgba(0,0,0,0.2); z-index: 5; border-radius: 6px; }
   .list-paper .item { flex: 1; font-family: 'Caveat', cursive; font-weight: 600; font-size: 19px; color: var(--ink); min-width: 0; }
+  .list-paper li.bought .item { color: var(--ink-soft); text-decoration: line-through; text-decoration-style: wavy; text-decoration-color: var(--plum); text-decoration-thickness: 1.6px; }
   .drag-handle { background: none; border: none; color: var(--ink-soft); opacity: 0.55; font-size: 18px; padding: 2px 2px; line-height: 1; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; flex-shrink: 0; }
   .hbox-btn { background: none; border: none; padding: 0; cursor: pointer; display: flex; flex-shrink: 0; color: var(--ink-soft); }
   .hbox-btn:hover { color: var(--sage); }
+  .hbox-btn.is-checked { color: var(--sage); }
+  .clear-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(58,44,30,0.3); font-family: 'Courier Prime', monospace; font-size: 12px; color: var(--ink-soft); }
+  .clear-bar button { background: none; border: 1px solid var(--terracotta); color: var(--terracotta); border-radius: 8px; padding: 6px 13px; font-size: 12px; cursor: pointer; font-weight: 700; font-family: 'Courier Prime', monospace; white-space: nowrap; }
+  .clear-bar button:hover { background: var(--terracotta); color: #fff; }
   .edit-input { flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: 'Lora', serif; outline: none; min-width: 0; color: var(--ink); }
   .edit-input:focus { box-shadow: 0 0 0 2px rgba(173,132,52,0.35); }
   .paper-btn { background: #fff; border: 1px solid var(--sage); color: var(--sage); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: 700; white-space: nowrap; }
@@ -352,8 +357,16 @@
     await persist(tasks, [item, ...shopping], notes);
     focusInput("newShopItem");
   }
-  async function boughtItem(id) {
-    await persist(tasks, shopping.filter((s) => s.id !== id), notes);
+  async function toggleBought(id) {
+    const next = shopping.map((s) => (s.id === id ? { ...s, bought: !s.bought } : s));
+    await persist(tasks, next, notes);
+  }
+  function clearBoughtItems() {
+    const boughtCount = shopping.filter((s) => s.bought).length;
+    if (boughtCount === 0) return;
+    askConfirm(`${boughtCount} durchgestrichene ${boughtCount === 1 ? "Ding" : "Dinge"} endgültig löschen?`, async () => {
+      await persist(tasks, shopping.filter((s) => !s.bought), notes);
+    });
   }
   let editingShopId = null;
   function startEditShopping(id) {
@@ -484,6 +497,7 @@
   function renderHome() {
     const body = document.getElementById("chapterBody");
     const openTasks = tasks.filter((t) => t.status === "active").length;
+    const openShopping = shopping.filter((s) => !s.bought).length;
     body.innerHTML = `
       <p class="home-meta">für Dome &amp; Sarah</p>
       <div class="chapters">
@@ -498,7 +512,7 @@
           <span class="chapter-icon">${ICON_SHOP}</span>
           <span class="chapter-body">
             <span class="chapter-title">Einkaufsliste</span>
-            <span class="chapter-sub">${shopping.length} ${shopping.length === 1 ? "Ding" : "Dinge"} auf der Liste</span>
+            <span class="chapter-sub">${openShopping} ${openShopping === 1 ? "Ding" : "Dinge"} auf der Liste</span>
           </span>
         </button>
         <button class="chapter chapter--notes" data-chapter="notes">
@@ -621,6 +635,7 @@
       shopping.forEach((s) => {
         const li = document.createElement("li");
         li.dataset.shopid = s.id;
+        if (s.bought) li.classList.add("bought");
         if (editingShopId === s.id) {
           const handle = document.createElement("span");
           handle.className = "drag-handle";
@@ -657,15 +672,24 @@
           list.appendChild(li);
           requestAnimationFrame(() => { input.focus(); input.select(); });
         } else {
+          const checkMark = s.bought ? `<path d="M5.5 10 8.5 13 14.5 6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>` : "";
           li.innerHTML = `
             <button class="drag-handle" data-drag="${s.id}" aria-label="Verschieben">⠿</button>
-            <button class="hbox-btn" data-bought="${s.id}" aria-label="Als gekauft markieren"><svg width="18" height="18" viewBox="0 0 20 20">${CHECKBOX_SVG}</svg></button>
+            <button class="hbox-btn${s.bought ? " is-checked" : ""}" data-bought="${s.id}" aria-label="${s.bought ? "Wieder hervorholen" : "Als gekauft markieren"}"><svg width="18" height="18" viewBox="0 0 20 20">${CHECKBOX_SVG}${checkMark}</svg></button>
             <span class="item">${escapeHtml(s.text)}</span>
             <button class="edit-btn" data-edit="${s.id}" aria-label="Bearbeiten">✏️</button>`;
           list.appendChild(li);
         }
       });
       screen.appendChild(list);
+
+      const boughtCount = shopping.filter((s) => s.bought).length;
+      if (boughtCount > 0) {
+        const bar = document.createElement("div");
+        bar.className = "clear-bar";
+        bar.innerHTML = `<span>${boughtCount} durchgestrichen</span><button id="clearBoughtBtn" type="button">Löschen</button>`;
+        screen.appendChild(bar);
+      }
     }
     screen.insertAdjacentHTML("beforeend", PENCIL_SVG);
 
@@ -674,9 +698,11 @@
     el.innerHTML = "";
     el.appendChild(clipboard);
 
-    el.querySelectorAll("[data-bought]").forEach((b) => b.addEventListener("click", () => boughtItem(b.dataset.bought)));
+    el.querySelectorAll("[data-bought]").forEach((b) => b.addEventListener("click", () => toggleBought(b.dataset.bought)));
     el.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => startEditShopping(b.dataset.edit));
     el.querySelectorAll("[data-drag]").forEach((h) => h.addEventListener("pointerdown", (e) => shoppingDragStart(h.dataset.drag, e)));
+    const clearBtn = document.getElementById("clearBoughtBtn");
+    if (clearBtn) clearBtn.onclick = clearBoughtItems;
   }
 
   // ---------- Kapitel: Notizen ----------
