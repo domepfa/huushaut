@@ -1,4 +1,4 @@
-const CACHE = "haushaltsplan-v5";
+const CACHE = "haushaltsplan-v6";
 const ASSETS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -36,7 +36,15 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
+  // App selbst (HTML, Manifest): immer zuerst aus dem Netz, damit jedes Gerät
+  // sofort die aktuelle Version bekommt. Nur ohne Netz die gespeicherte Kopie.
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request))
+    fetch(e.request).then((res) => {
+      if (res.ok && new URL(url).origin === self.location.origin) {
+        const clone = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request).then((cached) => cached || caches.match("./index.html")))
   );
 });
