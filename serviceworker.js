@@ -1,5 +1,5 @@
-const CACHE = "haushaltsplan-v6";
-const ASSETS = ["./", "./index.html", "./manifest.json"];
+const CACHE = "haushaltsplan-v7";
+const ASSETS = ["./", "./index.html", "./manifest.json", "./img/plan.jpg", "./img/einkauf.jpg", "./img/notizen.jpg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
