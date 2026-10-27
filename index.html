@@ -33,6 +33,13 @@
   body::before { content: ""; position: fixed; width: 340px; height: 340px; border-radius: 50%; background: var(--sun); top: -170px; right: -120px; z-index: -1; }
   body::after { content: ""; position: fixed; width: 220px; height: 220px; border-radius: 50%; background: var(--sky); bottom: -90px; left: -90px; opacity: .55; z-index: -1; }
   button { font-family: inherit; }
+  .ic { display: block; flex-shrink: 0; }
+  .back-btn, .icon-btn, form.add button, .card .del, .tv-icon, .edit-btn, .del-btn, .note-del, .toast button.x, form.hand-add button { display: inline-grid; place-items: center; }
+  .next-season { display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .setup .plain { display: inline-flex; align-items: center; gap: 6px; }
+  .confirm-bar { display: flex; gap: 8px; align-items: flex-start; }
+  .confirm-bar .ic { color: var(--coral-dark); margin-top: 1px; }
+  .party .ic { margin: 0 auto 8px; }
   button:focus-visible, input:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
   .wrap { max-width: 640px; margin: 0 auto; padding: 18px 16px 90px; }
 
@@ -117,7 +124,7 @@
   .card.is-done .reopen { border: none; background: #EEF2F0; color: var(--ink); font: 700 13px var(--ui); border-radius: 12px; padding: 6px 10px; cursor: pointer; flex-shrink: 0; }
   .who-dot { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 800; vertical-align: 1px; margin-right: 4px; }
   .empty { background: rgba(255,255,255,.6); border-radius: 22px; padding: 26px 18px; text-align: center; font-weight: 600; color: var(--ink-soft); font-size: 16px; }
-  .empty .big { font-size: 40px; display: block; margin-bottom: 4px; }
+  .empty .art, .tv-empty .art { display: flex; justify-content: center; margin-bottom: 6px; opacity: .8; }
 
   /* ---- Konfetti & Feier ---- */
   #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
@@ -213,7 +220,6 @@
   .next-season:active { background: rgba(255,176,92,.12); }
   .tv-edit { flex: 1; min-width: 0; border: 2px solid #FFB05C; background: rgba(255,255,255,.08); color: #fff; border-radius: 10px; padding: 6px 10px; font: 700 18px var(--ui); outline: none; }
   .tv-empty { text-align: center; padding: 30px 10px; color: rgba(243,233,220,.75); font-weight: 600; }
-  .tv-empty .big { font-size: 44px; display: block; }
 
   /* ---- Toast & Dialog ---- */
   #toastWrap { position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; justify-content: center; z-index: 70; pointer-events: none; padding: 0 16px; }
@@ -294,8 +300,24 @@
     <circle cx="22" cy="54" r="4" fill="#FF8FA3" opacity=".6"/><circle cx="58" cy="54" r="4" fill="#FF8FA3" opacity=".6"/>
   </svg>`;
   const PENCIL_SVG = `<svg class="pencil-deco" viewBox="0 0 210 16" aria-hidden="true"><rect x="0" y="3" width="18" height="10" rx="2" fill="#E7798C"/><rect x="17" y="3" width="10" height="10" fill="#C9C2A6"/><rect x="26" y="3" width="150" height="10" fill="#E9B949"/><path d="M26 6 h150" stroke="rgba(255,255,255,.35)" stroke-width="2"/><polygon points="176,3 205,8 176,13" fill="#D9B98A"/><polygon points="196,6.2 205,8 196,9.8" fill="#333"/></svg>`;
+  // Strichzeichnungen statt Emojis: alle mit derselben Linie (2px, runde Enden)
+  const ICONS = {
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+    pencil: '<path d="M4 20l1.2-4.2L15.6 5.4a2 2 0 012.8 0l.2.2a2 2 0 010 2.8L8.2 18.8z"/><path d="M13.5 7.5l3 3"/>',
+    settings: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    warn: '<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.2v.1"/>',
+    next: '<path d="M9 6l6 6-6 6"/>',
+    broom: '<path d="M15 2.5l-3.5 8.5"/><path d="M8 11h7l3.5 9.5h-14z"/><path d="M9 15l-1 5.5M12 15v5.5M15 15l1 5.5"/>',
+    sofa: '<path d="M5 11V8.5A2.5 2.5 0 017.5 6h9A2.5 2.5 0 0119 8.5V11"/><path d="M3.5 11A1.5 1.5 0 015 12.5V14h14v-1.5a1.5 1.5 0 013 0V18H2v-5.5A1.5 1.5 0 013.5 11z"/><path d="M5 18v2M19 18v2"/>',
+    note: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    tv: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M8.5 2.5L12 6l3.5-3.5"/>',
+  };
+  const icon = (name, size = 20) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
   const CHECK_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 L10 17 L19 7" stroke="#FFD84D" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const LINES = ["Blitzblank! ✨", "Du Held:in!", "Weg damit! 🙌", "Läuft bei euch!", "Staubi ist stolz!", "Ein Ding weniger!", "Das Sofa rückt näher 🛋️", "Stark gemacht!", "So sauber, ich blende! 😎"];
+  const LINES = ["Blitzblank!", "Du Held:in!", "Weg damit!", "Läuft bei euch!", "Staubi ist stolz!", "Ein Ding weniger!", "Das Sofa rückt näher.", "Stark gemacht!", "So sauber, ich blende!"];
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const wait = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? 0 : ms));
 
@@ -386,7 +408,7 @@
       b.onclick = () => { wrap.innerHTML = ""; a.onClick(); };
       t.appendChild(b);
     });
-    const x = document.createElement("button"); x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", "Schliessen");
+    const x = document.createElement("button"); x.className = "x"; x.innerHTML = icon("x", 16); x.setAttribute("aria-label", "Schliessen");
     x.onclick = () => (wrap.innerHTML = ""); t.appendChild(x);
     wrap.appendChild(t);
     clearTimeout(toastTimer);
@@ -422,7 +444,7 @@
   function greeting() {
     const h = new Date().getHours();
     const hi = h < 11 ? "Guten Morgen" : h < 17 ? "Hallo" : h < 22 ? "Schönen Abend" : "Gute Nacht";
-    return `${hi}${me ? ", " + me : ""}! ${h >= 22 ? "Morgen ist auch noch ein Tag 🌙" : "Packen wir's an? 💪"}`;
+    return `${hi}${me ? ", " + me : ""}! ${h >= 22 ? "Morgen ist auch noch ein Tag." : "Packen wir's an?"}`;
   }
   function cheer(text) {
     staubiLine = text;
@@ -714,7 +736,7 @@
     if (task.category !== "once") actions.push({ label: `Doch ${other}`, onClick: () => write({ [`tasks.${id}.doneBy`]: other }) });
     showToast(`${task.title} · ${person}`, actions);
     const left = tasks.filter((t) => t.status === "active" && t.id !== id).length;
-    if (left === 0) { await wait(300); party("Alles erledigt!<br>🎉 Sofa-Zeit 🎉"); cheer("Alles erledigt! Ich bin so stolz! 🥹"); }
+    if (left === 0) { await wait(300); party(`${icon("sofa", 64)}Alles erledigt!<br>Sofa-Zeit`); cheer("Alles erledigt! Ich bin so stolz!"); }
   }
   function undoDone(prev) {
     if (prev.category === "once") write({ [`tasks.${prev.id}`]: prev });
@@ -921,11 +943,9 @@
     if (field === "season") setSeriesPos(id, (item.season || 1) + delta, item.episode || 1, delta, "season");
     else setSeriesPos(id, item.season || 1, (item.episode || 1) + delta, delta, "episode");
   }
-  function nextSeason(id, btn) {
+  function nextSeason(id) {
     const item = series.find((x) => x.id === id);
     if (!item) return;
-    const r = btn.getBoundingClientRect();
-    confetti(r.left + r.width / 2, r.top, 40, 6);
     setSeriesPos(id, (item.season || 1) + 1, 1, 1, "both");
     showToast(`${item.title}: weiter mit Staffel ${(item.season || 1) + 1}`, [{ label: "Rückgängig", onClick: () => setSeriesPos(id, item.season || 1, item.episode || 1, -1, "both") }]);
   }
@@ -968,15 +988,15 @@
       <div class="wrap">
         <header class="app-head">
           <div class="title-row">
-            ${activeChapter !== "home" ? `<button class="back-btn" id="backHomeBtn" aria-label="Zurück">←</button>` : ""}
+            ${activeChapter !== "home" ? `<button class="back-btn" id="backHomeBtn" aria-label="Zurück">${icon("back", 22)}</button>` : ""}
             <div>
               <h1>${chapterTitle}</h1>
               <p class="sub"><span class="dot ${dotClass}"></span>${dotText}</p>
             </div>
           </div>
-          <button class="icon-btn" id="settingsLink" aria-label="Einstellungen">⚙</button>
+          <button class="icon-btn" id="settingsLink" aria-label="Einstellungen">${icon("settings", 22)}</button>
         </header>
-        ${saveError ? `<div class="confirm-bar">⚠️ ${saveError}</div>` : ""}
+        ${saveError ? `<div class="confirm-bar">${icon("warn", 18)}<span>${saveError}</span></div>` : ""}
         <div id="chapterBody"></div>
       </div>`;
 
@@ -1013,7 +1033,7 @@
       <div class="hello">${staubiSvg()}<div class="bubble" id="bubble">${escapeHtml(staubiLine || greeting())}</div></div>
       <div class="progress">
         <svg class="ring" viewBox="0 0 56 56" aria-hidden="true"><circle class="bg" cx="28" cy="28" r="23"/><circle class="val" cx="28" cy="28" r="23" stroke-dasharray="${C}" stroke-dashoffset="${C - C * frac}"/></svg>
-        <div><b>${tasks.length ? `${doneTasks} von ${tasks.length} erledigt` : "Noch keine Aufgaben"}</b><span>${tasks.length && !openTasks ? "Alles geschafft. Füsse hoch! 🛋️" : "im aktuellen Haushaltsplan"}</span></div>
+        <div><b>${tasks.length ? `${doneTasks} von ${tasks.length} erledigt` : "Noch keine Aufgaben"}</b><span>${tasks.length && !openTasks ? "Alles geschafft. Füsse hoch!" : "im aktuellen Haushaltsplan"}</span></div>
       </div>
       <div class="chapters${entering ? " intro" : ""}">
         <button class="chapter chapter--plan" data-chapter="plan">
@@ -1062,7 +1082,7 @@
     const meta = CATEGORIES[activeTab];
     slot.innerHTML = `<form class="add" id="addForm">
       <input id="newTitle" type="text" placeholder="Neue ${meta.label.toLowerCase()}e Aufgabe…" autocomplete="off" aria-label="Neue Aufgabe" />
-      <button type="submit" aria-label="Anlegen">+</button>
+      <button type="submit" aria-label="Anlegen">${icon("plus", 24)}</button>
     </form>`;
     document.getElementById("addForm").addEventListener("submit", addTask);
   }
@@ -1076,10 +1096,10 @@
     if (visible.length === 0) {
       const anyInCat = tasks.some((t) => t.category === activeTab);
       el.innerHTML = isErledigt
-        ? `<div class="empty"><span class="big">🧹</span>Noch nichts erledigt. Staubi wartet schon.</div>`
+        ? `<div class="empty"><span class="art">${icon("broom", 56)}</span>Noch nichts erledigt. Staubi wartet schon.</div>`
         : anyInCat
-          ? `<div class="empty"><span class="big">🎉</span>Alles erledigt hier. Gönnt euch was!</div>`
-          : `<div class="empty"><span class="big">📝</span>Noch keine ${CATEGORIES[activeTab].label.toLowerCase()}e Aufgabe. Leg oben die erste an.</div>`;
+          ? `<div class="empty"><span class="art">${icon("sofa", 56)}</span>Alles erledigt hier. Gönnt euch was!</div>`
+          : `<div class="empty"><span class="art">${icon("note", 56)}</span>Noch keine ${CATEGORIES[activeTab].label.toLowerCase()}e Aufgabe. Leg oben die erste an.</div>`;
       return;
     }
     const wrap = document.createElement("div");
@@ -1093,12 +1113,12 @@
         card.innerHTML = `<span class="check" aria-hidden="true">${CHECK_SVG}</span>
           <div class="t"><b>${escapeHtml(t.title)}</b><small><span class="who-dot" style="background:${color}">${escapeHtml((t.doneBy || "?")[0])}</span>${escapeHtml(t.doneBy || "")} · ${formatDate(t.doneAt)}</small></div>
           <button class="reopen" data-reopen="${t.id}">Wieder offen</button>
-          <button class="del" data-del="${t.id}" aria-label="Löschen">✕</button>`;
+          <button class="del" data-del="${t.id}" aria-label="Löschen">${icon("x", 18)}</button>`;
       } else {
         card.className = `card cat-${t.category}`;
         card.innerHTML = `<button class="check" data-done="${t.id}" aria-label="${escapeHtml(t.title)} erledigt">${CHECK_SVG}</button>
           <div class="t"><b>${escapeHtml(t.title)}</b><small>${CATEGORIES[t.category].note}</small></div>
-          <button class="del" data-del="${t.id}" aria-label="Löschen">✕</button>`;
+          <button class="del" data-del="${t.id}" aria-label="Löschen">${icon("x", 18)}</button>`;
       }
       wrap.appendChild(card);
     });
@@ -1121,7 +1141,7 @@
           <div id="content"></div>
           <form class="hand-add" id="shopForm">
             <input id="newShopItem" type="text" placeholder="+ Was fehlt?" autocomplete="off" aria-label="Neuer Eintrag" enterkeyhint="done" />
-            <button type="submit" aria-label="Hinzufügen">✓</button>
+            <button type="submit" aria-label="Hinzufügen">${icon("check", 24)}</button>
           </form>
         </div>
         ${PENCIL_SVG}
@@ -1141,7 +1161,7 @@
       if (clearBtn) clearBtn.onclick = clearBoughtItems;
     }
     if (shopping.length === 0) {
-      el.innerHTML = `<div class="empty-hand">Alles da! Nichts zu kaufen. ☺</div>`;
+      el.innerHTML = `<div class="empty-hand">Alles da! Nichts zu kaufen.</div>`;
       return;
     }
     const list = document.createElement("ul");
@@ -1176,7 +1196,7 @@
         cancelBtn.type = "button";
         cancelBtn.className = "del-btn";
         cancelBtn.setAttribute("aria-label", "Abbrechen");
-        cancelBtn.textContent = "✕";
+        cancelBtn.innerHTML = icon("x", 18);
         cancelBtn.onclick = () => cancelShoppingEdit();
         li.append(handle, input, saveBtn, cancelBtn);
         const firstOpen = editingShopDraft === null;
@@ -1185,7 +1205,7 @@
         li.innerHTML = `
           <button class="drag-handle" data-drag="${s.id}" aria-label="Verschieben">⠿</button>
           <button class="item-btn" data-bought="${s.id}" aria-label="${s.bought ? "Wieder auf die Liste" : "Als gekauft durchstreichen"}: ${escapeHtml(s.text)}"><span class="item">${escapeHtml(s.text)}${s.bought ? strikeSvg(s.id) : ""}</span></button>
-          <button class="edit-btn" data-edit="${s.id}" aria-label="Bearbeiten">✎</button>`;
+          <button class="edit-btn" data-edit="${s.id}" aria-label="Bearbeiten">${icon("pencil", 18)}</button>`;
       }
       list.appendChild(li);
     });
@@ -1207,7 +1227,7 @@
       <div class="tv-room${entering ? " enter" : ""}">
         <form class="add" id="seriesForm">
           <input id="newSeries" type="text" placeholder="Neue Serie…" autocomplete="off" aria-label="Neue Serie" />
-          <button type="submit" aria-label="Hinzufügen">+</button>
+          <button type="submit" aria-label="Hinzufügen">${icon("plus", 24)}</button>
         </form>
         <div id="content"></div>
       </div>`;
@@ -1219,7 +1239,7 @@
     if (!el) return;
     const list = sortedSeries();
     if (list.length === 0) {
-      el.innerHTML = `<div class="tv-empty"><span class="big">📺</span>Noch keine Serie. Tragt oben ein, was ihr gerade schaut.</div>`;
+      el.innerHTML = `<div class="tv-empty"><span class="art">${icon("tv", 56)}</span>Noch keine Serie. Tragt oben ein, was ihr gerade schaut.</div>`;
       return;
     }
     const wrap = document.createElement("div");
@@ -1230,9 +1250,9 @@
       const anim = (field) => steppedSeries && steppedSeries.id === x.id && (steppedSeries.field === field || steppedSeries.field === "both") ? (steppedSeries.dir > 0 ? " up" : " down") : "";
       const who = x.updatedBy ? ` von ${escapeHtml(x.updatedBy)}` : "";
       const top = editingSeriesId === x.id
-        ? `<div class="tv-top"><input class="tv-edit" id="editSeries" value="${escapeHtml(x.title)}" aria-label="Name der Serie" /><button class="tv-icon" data-save="${x.id}" aria-label="Speichern">✓</button></div>`
+        ? `<div class="tv-top"><input class="tv-edit" id="editSeries" value="${escapeHtml(x.title)}" aria-label="Name der Serie" /><button class="tv-icon" data-save="${x.id}" aria-label="Speichern">${icon("check", 18)}</button></div>`
         : `<div class="tv-top"><div style="flex:1;min-width:0"><div class="tv-title">${escapeHtml(x.title)}</div><div class="tv-meta">zuletzt ${sinceText(x.updatedAt)}${who}</div></div>
-            <button class="tv-icon" data-rename="${x.id}" aria-label="Umbenennen">✎</button><button class="tv-icon" data-delseries="${x.id}" aria-label="Entfernen">✕</button></div>`;
+            <button class="tv-icon" data-rename="${x.id}" aria-label="Umbenennen">${icon("pencil", 17)}</button><button class="tv-icon" data-delseries="${x.id}" aria-label="Entfernen">${icon("x", 17)}</button></div>`;
       tv.innerHTML = `<div class="tv-screen">${top}
           <div class="tv-counters">
             <div class="counter"><div class="counter-label">Staffel</div><div class="counter-row">
@@ -1244,7 +1264,7 @@
               <span class="num${anim("episode")}" aria-live="polite">${x.episode}</span>
               <button class="plus" data-step="${x.id}" data-field="episode" data-d="1" aria-label="Episode weiter">+</button></div></div>
           </div>
-          <button class="next-season" data-next="${x.id}">Staffel fertig, weiter mit Staffel ${x.season + 1} ▸</button>
+          <button class="next-season" data-next="${x.id}">Staffel fertig, weiter mit Staffel ${x.season + 1} ${icon("next", 16)}</button>
         </div>`;
       wrap.appendChild(tv);
     });
@@ -1252,7 +1272,7 @@
     el.innerHTML = "";
     el.appendChild(wrap);
     el.querySelectorAll("[data-step]").forEach((b) => b.onclick = () => stepSeries(b.dataset.step, b.dataset.field, +b.dataset.d));
-    el.querySelectorAll("[data-next]").forEach((b) => b.onclick = () => nextSeason(b.dataset.next, b));
+    el.querySelectorAll("[data-next]").forEach((b) => b.onclick = () => nextSeason(b.dataset.next));
     el.querySelectorAll("[data-delseries]").forEach((b) => b.onclick = () => deleteSeries(b.dataset.delseries));
     el.querySelectorAll("[data-rename]").forEach((b) => b.onclick = () => { editingSeriesId = b.dataset.rename; renderSeriesContent(); });
     const edit = document.getElementById("editSeries");
@@ -1274,7 +1294,7 @@
     const slot = document.getElementById("formSlot");
     slot.innerHTML = `<form class="add" id="noteForm">
       <input id="newNote" type="text" placeholder="Notiz an die Tafel schreiben…" autocomplete="off" aria-label="Neue Notiz" />
-      <button type="submit" aria-label="Anschreiben">+</button>
+      <button type="submit" aria-label="Anschreiben">${icon("plus", 24)}</button>
     </form>`;
     document.getElementById("noteForm").addEventListener("submit", addNote);
     renderNotesContent();
@@ -1294,7 +1314,7 @@
         const row = document.createElement("p");
         row.style.setProperty("--r", `${rotations[i % rotations.length]}deg`);
         if (n.id === justAddedNoteId) row.className = "write";
-        row.innerHTML = `<span class="note-text">${escapeHtml(n.text)}</span><button class="note-del" data-delnote="${n.id}" aria-label="Löschen">✕</button>`;
+        row.innerHTML = `<span class="note-text">${escapeHtml(n.text)}</span><button class="note-del" data-delnote="${n.id}" aria-label="Löschen">${icon("x", 18)}</button>`;
         wrap.appendChild(row);
       });
       board.appendChild(wrap);
@@ -1311,7 +1331,7 @@
     const root = document.getElementById("root");
     root.innerHTML = `
       <div class="setup" id="settingsScreen">
-        <div><button class="plain" id="backBtn">← Zurück</button></div>
+        <div><button class="plain" id="backBtn">${icon("back", 18)} Zurück</button></div>
         <h2>Einstellungen</h2>
 
         <div class="box">
