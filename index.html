@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Huushaut" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Caveat:wght@600;700&family=VT323&display=swap" rel="stylesheet" />
 <style>
   :root {
     --mint: #DFF3EC; --ink: #142B2A; --ink-soft: #4C6563; --muted: #7A8F8C;
@@ -81,7 +81,7 @@
   .chapter--shop { background-image: url(img/einkauf.jpg); }
   .chapter--notes { background-image: url(img/notizen.jpg); }
   .chapters.intro .chapter { animation: rise .55s cubic-bezier(.3,1.4,.5,1) both; }
-  .chapters.intro .chapter:nth-child(2) { animation-delay: .07s; } .chapters.intro .chapter:nth-child(3) { animation-delay: .14s; }
+  .chapters.intro .chapter:nth-child(2) { animation-delay: .07s; } .chapters.intro .chapter:nth-child(3) { animation-delay: .14s; } .chapters.intro .chapter:nth-child(4) { animation-delay: .21s; }
   @keyframes rise { from { transform: translateY(24px); opacity: 0; } }
 
   /* ---- Haushaltsplan ---- */
@@ -173,6 +173,47 @@
   .chalk-tray { position: absolute; left: 20px; right: 20px; bottom: 14px; height: 10px; display: flex; align-items: center; gap: 10px; }
   .chalk-stick { width: 28px; height: 8px; border-radius: 2px; background: #E7E1D0; box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
   .eraser { width: 36px; height: 11px; border-radius: 2px; background: linear-gradient(#8a7256, #6d5842); box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+
+  /* ---- Serien: Fernseh-Abend ---- */
+  .chapter--tv { background-image: url(img/serien.jpg); }
+  .tv-room { position: relative; margin: 0 -16px; padding: 18px 16px 26px; min-height: 70vh; border-radius: 30px 30px 0 0; color: #F3E9DC;
+    background: radial-gradient(ellipse 70% 40% at 85% 0%, rgba(255,176,92,.28), transparent 70%), radial-gradient(ellipse 60% 50% at 0% 100%, rgba(120,90,255,.18), transparent 70%), linear-gradient(180deg, #2A2240, #17142A 60%); box-shadow: 0 -6px 0 var(--lift); }
+  .tv-room.enter { animation: dim .6s ease both; }
+  @keyframes dim { from { filter: brightness(1.8) saturate(.6); } }
+  .tv-room form.add input { background: rgba(255,255,255,.08); border-color: transparent; color: #F3E9DC; box-shadow: none; }
+  .tv-room form.add input:focus { border-color: #FFB05C; }
+  .tv-room form.add input::placeholder { color: rgba(243,233,220,.5); }
+  .tv-room form.add button { background: #FFB05C; color: #2A2240; box-shadow: 0 4px 0 #C77F2E; }
+  .tv-list { display: grid; gap: 18px; }
+  .tv { position: relative; border-radius: 22px; padding: 10px; background: linear-gradient(160deg, #3A3252, #241E38); box-shadow: 0 10px 22px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08); }
+  .tv::after { content: ""; position: absolute; left: 50%; bottom: -8px; width: 70px; height: 8px; margin-left: -35px; border-radius: 0 0 8px 8px; background: #1C172B; }
+  .tv-screen { position: relative; border-radius: 14px; padding: 14px 14px 12px; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 120%, rgba(255,176,92,.22), transparent 60%), radial-gradient(ellipse at 30% -20%, rgba(150,200,255,.18), transparent 60%), #0F0D1A;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), inset 0 0 30px rgba(0,0,0,.6); }
+  .tv-screen::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(transparent 0 2px, rgba(255,255,255,.025) 2px 3px); }
+  .tv.flicker .tv-screen { animation: flicker .35s steps(3); }
+  @keyframes flicker { 0% { filter: brightness(2.2); } 50% { filter: brightness(.6); } 100% { filter: none; } }
+  .tv-top { display: flex; align-items: flex-start; gap: 8px; }
+  .tv-title { flex: 1; min-width: 0; font-weight: 800; font-size: 21px; line-height: 1.1; overflow-wrap: anywhere; color: #fff; text-shadow: 0 0 12px rgba(150,200,255,.35); }
+  .tv-meta { font-size: 12.5px; color: rgba(243,233,220,.55); font-weight: 600; margin-top: 2px; }
+  .tv-icon { width: 34px; height: 34px; border: none; background: rgba(255,255,255,.07); color: rgba(243,233,220,.7); border-radius: 10px; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+  .tv-counters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .counter { background: rgba(255,255,255,.05); border-radius: 14px; padding: 8px 6px 6px; text-align: center; }
+  .counter-label { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: rgba(243,233,220,.55); font-weight: 700; }
+  .counter-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+  .counter-row button { width: 44px; height: 44px; border-radius: 14px; border: none; font: 800 24px/1 var(--ui); cursor: pointer; flex-shrink: 0; }
+  .counter-row .minus { background: rgba(255,255,255,.08); color: #F3E9DC; }
+  .counter-row .plus { background: #FFB05C; color: #2A2240; box-shadow: 0 3px 0 #C77F2E; }
+  .counter-row button:active { transform: translateY(3px); box-shadow: none; }
+  .counter-row button:disabled { opacity: .3; }
+  .num { font: 400 46px/1 'VT323', ui-monospace, monospace; color: #9FE7FF; text-shadow: 0 0 10px rgba(110,210,255,.7); min-width: 2ch; display: inline-block; font-variant-numeric: tabular-nums; }
+  .num.up { animation: rollUp .3s cubic-bezier(.3,1.5,.5,1); } .num.down { animation: rollDown .3s cubic-bezier(.3,1.5,.5,1); }
+  @keyframes rollUp { from { transform: translateY(60%); opacity: 0; } } @keyframes rollDown { from { transform: translateY(-60%); opacity: 0; } }
+  .next-season { width: 100%; margin-top: 10px; border: 1.5px dashed rgba(255,176,92,.55); background: none; color: #FFB05C; font: 700 15px var(--ui); border-radius: 14px; padding: 9px; cursor: pointer; }
+  .next-season:active { background: rgba(255,176,92,.12); }
+  .tv-edit { flex: 1; min-width: 0; border: 2px solid #FFB05C; background: rgba(255,255,255,.08); color: #fff; border-radius: 10px; padding: 6px 10px; font: 700 18px var(--ui); outline: none; }
+  .tv-empty { text-align: center; padding: 30px 10px; color: rgba(243,233,220,.75); font-weight: 600; }
+  .tv-empty .big { font-size: 44px; display: block; }
 
   /* ---- Toast & Dialog ---- */
   #toastWrap { position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; justify-content: center; z-index: 70; pointer-events: none; padding: 0 16px; }
@@ -271,6 +312,7 @@
   let tasks = [];
   let shopping = [];
   let notes = [];
+  let series = [];
   let activeChapter = "home"; // home | plan | shopping | notes
   let activeTab = "weekly";   // weekly | monthly | once | erledigt (innerhalb "plan")
   let db = null;
@@ -472,22 +514,25 @@
     const t = legacy ? arrayToMap(d.list) : d.tasks || {};
     const s = legacy ? arrayToMap((d.shopping || []).map((x, i) => ({ ...x, order: i }))) : d.shopping || {};
     const n = legacy ? arrayToMap(d.notes) : d.notes || {};
+    const tv = legacy ? {} : d.series || {};
     return {
       tasks: Object.values(t).filter((x) => x && x.id && x.title),
       shopping: Object.values(s).filter((x) => x && x.id && x.text).sort(byShopOrder),
       notes: Object.values(n).filter((x) => x && x.id && x.text),
+      series: Object.values(tv).filter((x) => x && x.id && x.title),
     };
   }
   function listsToMaps(lists) {
-    return { tasks: arrayToMap(lists.tasks), shopping: arrayToMap(lists.shopping), notes: arrayToMap(lists.notes) };
+    return { tasks: arrayToMap(lists.tasks), shopping: arrayToMap(lists.shopping), notes: arrayToMap(lists.notes), series: arrayToMap(lists.series) };
   }
   function applyLists(lists) {
     tasks = lists.tasks;
     shopping = lists.shopping;
     notes = lists.notes;
+    series = lists.series || [];
   }
   function renderIfChanged() {
-    const json = JSON.stringify([connStatus, saveError, tasks, shopping, notes]);
+    const json = JSON.stringify([connStatus, saveError, tasks, shopping, notes, series]);
     if (json === lastRenderedJson) return;
     if (dragState) { pendingRender = true; return; }
     lastRenderedJson = json;
@@ -839,6 +884,68 @@
     });
   }
 
+  // ---------- Serien ----------
+  let seriesOrder = [];      // Reihenfolge beim Öffnen festhalten, damit Karten beim Tippen nicht springen
+  let steppedSeries = null;  // { id, field, dir } für die Zahlen-Animation
+  let editingSeriesId = null;
+  function sortedSeries() {
+    const known = new Set(seriesOrder);
+    const fresh = series.filter((x) => !known.has(x.id)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const byId = new Map(series.map((x) => [x.id, x]));
+    return [...fresh, ...seriesOrder.map((id) => byId.get(id)).filter(Boolean)];
+  }
+  function addSeries(e) {
+    e.preventDefault();
+    const input = document.getElementById("newSeries");
+    const title = input.value.trim();
+    if (!title) return;
+    const now = Date.now();
+    const item = { id: uid(), title, season: 1, episode: 1, createdAt: now, updatedAt: now, updatedBy: me || null };
+    if (!write({ [`series.${item.id}`]: item })) return;
+    input.value = "";
+  }
+  // Absolute Werte schreiben: tippen beide gleichzeitig "+", landen sie beim selben Stand.
+  function setSeriesPos(id, season, episode, dir, field) {
+    const item = series.find((x) => x.id === id);
+    if (!item) return;
+    season = Math.max(1, Math.min(99, season));
+    episode = Math.max(1, Math.min(999, episode));
+    if (season === item.season && episode === item.episode) return;
+    steppedSeries = { id, field, dir };
+    if (dir > 0) buzz();
+    write({ [`series.${id}.season`]: season, [`series.${id}.episode`]: episode, [`series.${id}.updatedAt`]: Date.now(), [`series.${id}.updatedBy`]: me || null });
+  }
+  function stepSeries(id, field, delta) {
+    const item = series.find((x) => x.id === id);
+    if (!item) return;
+    if (field === "season") setSeriesPos(id, (item.season || 1) + delta, item.episode || 1, delta, "season");
+    else setSeriesPos(id, item.season || 1, (item.episode || 1) + delta, delta, "episode");
+  }
+  function nextSeason(id, btn) {
+    const item = series.find((x) => x.id === id);
+    if (!item) return;
+    const r = btn.getBoundingClientRect();
+    confetti(r.left + r.width / 2, r.top, 40, 6);
+    setSeriesPos(id, (item.season || 1) + 1, 1, 1, "both");
+    showToast(`${item.title}: weiter mit Staffel ${(item.season || 1) + 1}`, [{ label: "Rückgängig", onClick: () => setSeriesPos(id, item.season || 1, item.episode || 1, -1, "both") }]);
+  }
+  function renameSeries(id, raw) {
+    editingSeriesId = null;
+    const title = raw.trim();
+    const item = series.find((x) => x.id === id);
+    if (title && item && title !== item.title) write({ [`series.${id}.title`]: title });
+    else renderSeriesContent();
+  }
+  function deleteSeries(id) {
+    const item = series.find((x) => x.id === id);
+    askConfirm(`„${item ? item.title : "Serie"}" von der Liste nehmen?`, () => write({ [`series.${id}`]: deleteField() }), "Ja, entfernen");
+  }
+  function sinceText(ts) {
+    if (!ts) return "";
+    const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(ts).setHours(0, 0, 0, 0)) / 86400000);
+    return days <= 0 ? "heute" : days === 1 ? "gestern" : days < 7 ? `vor ${days} Tagen` : `am ${formatDate(ts)}`;
+  }
+
   // ---------- Rendering: Rahmen ----------
   function renderApp() {
     const root = document.getElementById("root");
@@ -855,7 +962,7 @@
     const sel = focusId ? [active.selectionStart, active.selectionEnd] : null;
     const dotClass = connStatus === "ok" ? "ok" : connStatus === "err" ? "err" : "wait";
     const dotText = connStatus === "ok" ? "verbunden" : connStatus === "err" ? "keine Verbindung" : "verbinde…";
-    const chapterTitle = activeChapter === "plan" ? "Haushaltsplan" : activeChapter === "shopping" ? "Einkaufsliste" : activeChapter === "notes" ? "Notizen" : "Huushaut";
+    const chapterTitle = activeChapter === "plan" ? "Haushaltsplan" : activeChapter === "shopping" ? "Einkaufsliste" : activeChapter === "notes" ? "Notizen" : activeChapter === "tv" ? "Serien" : "Huushaut";
 
     root.innerHTML = `
       <div class="wrap">
@@ -880,6 +987,7 @@
     if (activeChapter === "plan") renderPlanChapter();
     else if (activeChapter === "shopping") renderShoppingChapter(entering);
     else if (activeChapter === "notes") renderNotesChapter();
+    else if (activeChapter === "tv") renderSeriesChapter(entering);
     else renderHome(entering);
 
     Object.entries(typed).forEach(([id, v]) => { const i = document.getElementById(id); if (i && !i.value) i.value = v; });
@@ -917,6 +1025,9 @@
         </button>
         <button class="chapter chapter--notes" data-chapter="notes">
           <span class="chapter-body"><span class="chapter-title">Notizen</span><span class="chapter-sub">${notes.length} ${notes.length === 1 ? "Zettel" : "Zettel"} an der Tafel</span></span>
+        </button>
+        <button class="chapter chapter--tv" data-chapter="tv">
+          <span class="chapter-body"><span class="chapter-title">Serien</span><span class="chapter-sub">${series.length ? `${series.length} ${series.length === 1 ? "Serie" : "Serien"} am Laufen` : "Wo wart ihr stehen geblieben?"}</span></span>
         </button>
       </div>`;
     body.querySelectorAll("[data-chapter]").forEach((b) => b.onclick = () => { activeChapter = b.dataset.chapter; staubiLine = null; renderApp(); });
@@ -1088,6 +1199,74 @@
     el.querySelectorAll("[data-drag]").forEach((h) => h.addEventListener("pointerdown", (e) => shoppingDragStart(h.dataset.drag, e)));
   }
 
+  // ---------- Serien: Fernseh-Abend ----------
+  function renderSeriesChapter(entering) {
+    if (entering) seriesOrder = [...series].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).map((x) => x.id);
+    const body = document.getElementById("chapterBody");
+    body.innerHTML = `
+      <div class="tv-room${entering ? " enter" : ""}">
+        <form class="add" id="seriesForm">
+          <input id="newSeries" type="text" placeholder="Neue Serie…" autocomplete="off" aria-label="Neue Serie" />
+          <button type="submit" aria-label="Hinzufügen">+</button>
+        </form>
+        <div id="content"></div>
+      </div>`;
+    document.getElementById("seriesForm").addEventListener("submit", addSeries);
+    renderSeriesContent();
+  }
+  function renderSeriesContent() {
+    const el = document.getElementById("content");
+    if (!el) return;
+    const list = sortedSeries();
+    if (list.length === 0) {
+      el.innerHTML = `<div class="tv-empty"><span class="big">📺</span>Noch keine Serie. Tragt oben ein, was ihr gerade schaut.</div>`;
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "tv-list";
+    list.forEach((x) => {
+      const tv = document.createElement("div");
+      tv.className = "tv" + (steppedSeries && steppedSeries.id === x.id ? " flicker" : "");
+      const anim = (field) => steppedSeries && steppedSeries.id === x.id && (steppedSeries.field === field || steppedSeries.field === "both") ? (steppedSeries.dir > 0 ? " up" : " down") : "";
+      const who = x.updatedBy ? ` von ${escapeHtml(x.updatedBy)}` : "";
+      const top = editingSeriesId === x.id
+        ? `<div class="tv-top"><input class="tv-edit" id="editSeries" value="${escapeHtml(x.title)}" aria-label="Name der Serie" /><button class="tv-icon" data-save="${x.id}" aria-label="Speichern">✓</button></div>`
+        : `<div class="tv-top"><div style="flex:1;min-width:0"><div class="tv-title">${escapeHtml(x.title)}</div><div class="tv-meta">zuletzt ${sinceText(x.updatedAt)}${who}</div></div>
+            <button class="tv-icon" data-rename="${x.id}" aria-label="Umbenennen">✎</button><button class="tv-icon" data-delseries="${x.id}" aria-label="Entfernen">✕</button></div>`;
+      tv.innerHTML = `<div class="tv-screen">${top}
+          <div class="tv-counters">
+            <div class="counter"><div class="counter-label">Staffel</div><div class="counter-row">
+              <button class="minus" data-step="${x.id}" data-field="season" data-d="-1" aria-label="Staffel zurück" ${x.season <= 1 ? "disabled" : ""}>−</button>
+              <span class="num${anim("season")}" aria-live="polite">${x.season}</span>
+              <button class="plus" data-step="${x.id}" data-field="season" data-d="1" aria-label="Staffel weiter">+</button></div></div>
+            <div class="counter"><div class="counter-label">Episode</div><div class="counter-row">
+              <button class="minus" data-step="${x.id}" data-field="episode" data-d="-1" aria-label="Episode zurück" ${x.episode <= 1 ? "disabled" : ""}>−</button>
+              <span class="num${anim("episode")}" aria-live="polite">${x.episode}</span>
+              <button class="plus" data-step="${x.id}" data-field="episode" data-d="1" aria-label="Episode weiter">+</button></div></div>
+          </div>
+          <button class="next-season" data-next="${x.id}">Staffel fertig, weiter mit Staffel ${x.season + 1} ▸</button>
+        </div>`;
+      wrap.appendChild(tv);
+    });
+    steppedSeries = null;
+    el.innerHTML = "";
+    el.appendChild(wrap);
+    el.querySelectorAll("[data-step]").forEach((b) => b.onclick = () => stepSeries(b.dataset.step, b.dataset.field, +b.dataset.d));
+    el.querySelectorAll("[data-next]").forEach((b) => b.onclick = () => nextSeason(b.dataset.next, b));
+    el.querySelectorAll("[data-delseries]").forEach((b) => b.onclick = () => deleteSeries(b.dataset.delseries));
+    el.querySelectorAll("[data-rename]").forEach((b) => b.onclick = () => { editingSeriesId = b.dataset.rename; renderSeriesContent(); });
+    const edit = document.getElementById("editSeries");
+    if (edit) {
+      const id = editingSeriesId;
+      requestAnimationFrame(() => { edit.focus(); edit.select(); });
+      edit.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); renameSeries(id, edit.value); }
+        if (e.key === "Escape") { editingSeriesId = null; renderSeriesContent(); }
+      });
+      el.querySelector("[data-save]").onclick = () => renameSeries(id, edit.value);
+    }
+  }
+
   // ---------- Notizen: Kreidetafel ----------
   function renderNotesChapter() {
     const body = document.getElementById("chapterBody");
@@ -1155,7 +1334,7 @@
 
         <div class="box">
           <h2 style="color:var(--coral-dark);">Gefahrenzone</h2>
-          <p>Löscht <b>alle</b> Aufgaben, die Einkaufsliste und alle Notizen, für dich und Sarah. Vorher wird eine Sicherung angelegt. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
+          <p>Löscht <b>alle</b> Aufgaben, die Einkaufsliste, alle Notizen und Serien, für dich und Sarah. Vorher wird eine Sicherung angelegt. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
           <input id="resetConfirmInput" type="text" placeholder="LÖSCHEN eintippen" />
           <button id="doResetBtn" class="btn primary" disabled style="margin-top:12px; opacity:.45;">Endgültig alles löschen</button>
         </div>
@@ -1188,7 +1367,7 @@
         showToast("Sicherung fehlgeschlagen — es wurde nichts gelöscht");
         return;
       }
-      write({ tasks: {}, shopping: {}, notes: {} });
+      write({ tasks: {}, shopping: {}, notes: {}, series: {} });
       showToast("Alles gelöscht (Sicherung angelegt)");
       lastRenderedJson = null;
       renderApp();
@@ -1215,7 +1394,7 @@
       const when = `${formatDate(b.savedAt)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
       const row = document.createElement("div");
       row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;";
-      row.innerHTML = `<span>${when} · ${escapeHtml(b.reason)}<br><small>${lists.tasks.length} Aufgaben · ${lists.shopping.length} Einkauf · ${lists.notes.length} Notizen</small></span>`;
+      row.innerHTML = `<span>${when} · ${escapeHtml(b.reason)}<br><small>${lists.tasks.length} Aufgaben · ${lists.shopping.length} Einkauf · ${lists.notes.length} Notizen · ${lists.series.length} Serien</small></span>`;
       const btn = document.createElement("button");
       btn.className = "plain";
       btn.style.marginTop = "0";
@@ -1239,7 +1418,7 @@
 
   // ---------- Firebase-Verbindung ----------
   function saveLocalCache() {
-    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify(listsToMaps({ tasks, shopping, notes }))); } catch (e) {}
+    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify(listsToMaps({ tasks, shopping, notes, series }))); } catch (e) {}
   }
   // ---------- Anmeldung ----------
   function renderLoginScreen(message) {
@@ -1318,7 +1497,7 @@
         else {
           // Nicht angemeldet: zwischengespeicherte Daten nicht weiter anzeigen
           try { localStorage.removeItem(LS_DATA_KEY); localStorage.removeItem(LS_LEGACY_KEY); } catch (e) {}
-          applyLists({ tasks: [], shopping: [], notes: [] });
+          applyLists({ tasks: [], shopping: [], notes: [], series: [] });
         }
         lastRenderedJson = null;
         renderApp();
