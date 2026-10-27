@@ -187,7 +187,8 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { initializeFirestore, getFirestore, persistentLocalCache, doc, collection, setDoc, updateDoc, getDoc, getDocs, deleteDoc, deleteField, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { initializeFirestore, getFirestore, persistentLocalCache, doc, collection, setDoc, updateDoc, getDoc, getDocs, deleteDoc, deleteField, runTransaction, onSnapshot, terminate, clearIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
   const CATEGORIES = {
     weekly: { label: "Wöchentlich", accent: "var(--weekly)", ink: "var(--weekly-ink)", note: "Kehrt am Montag zurück" },
@@ -241,6 +242,11 @@
   let lastRenderedJson = null;
   let pendingRender = false; // Neuzeichnen aufgeschoben, solange gezogen wird
   let backupDoneFor = null;
+  let auth = null;
+  let currentUser = null;
+  let authChecked = false;   // erst nach der ersten Rückmeldung von Firebase Auth wissen wir, ob jemand angemeldet ist
+  let accessDenied = false;  // angemeldet, aber das Konto steht nicht in den Firestore-Regeln
+  let listenersStarted = false;
 
   const pad = (n) => String(n).padStart(2, "0");
   function getISOWeekKey(d) {
@@ -641,6 +647,8 @@
   // ---------- Rendering: Rahmen ----------
   function renderApp() {
     const root = document.getElementById("root");
+    if (authChecked && !currentUser) { renderLoginScreen(); return; }
+    if (accessDenied) { renderDeniedScreen(); return; }
     const dotClass = connStatus === "ok" ? "ok" : connStatus === "err" ? "err" : "wait";
     const dotText = connStatus === "ok" ? "verbunden" : connStatus === "err" ? "keine Verbindung" : "verbinde…";
     const chapterTitle = activeChapter === "plan" ? "Haushaltsplan" : activeChapter === "shopping" ? "Einkaufsliste" : activeChapter === "notes" ? "Notizen" : "Huushaut";
@@ -932,6 +940,12 @@
         <button class="plain" id="backBtn">← Zurück</button>
 
         <div style="margin-top:36px; border-top:1px solid var(--line); padding-top:20px;">
+          <h2 style="font-size:17px;">Konto</h2>
+          <p>Angemeldet als <b>${escapeHtml(currentUser ? currentUser.email || currentUser.displayName || "" : "—")}</b>.</p>
+          <button class="plain" id="logoutBtn">Abmelden</button>
+        </div>
+
+        <div style="margin-top:36px; border-top:1px solid var(--line); padding-top:20px;">
           <h2 style="font-size:17px;">Sicherungen</h2>
           <p>Die App sichert jeden Tag automatisch alle Aufgaben, die Einkaufsliste und die Notizen (die letzten ${BACKUP_KEEP_DAYS} Tage). Hier kannst du einen alten Stand für dich und Sarah zurückholen. Der aktuelle Stand wird vorher auch gesichert.</p>
           <div id="backupList"><p>Lade Sicherungen…</p></div>
@@ -946,6 +960,7 @@
       </div>`;
 
     document.getElementById("backBtn").onclick = () => { lastRenderedJson = null; renderApp(); };
+    document.getElementById("logoutBtn").onclick = () => askConfirm("Wirklich abmelden? Auf diesem Gerät werden dann keine Daten mehr angezeigt, bis du dich wieder anmeldest.", logout, "Ja, abmelden");
     renderBackupList();
 
     const input = document.getElementById("resetConfirmInput");
@@ -1019,6 +1034,59 @@
   function saveLocalCache() {
     try { localStorage.setItem(LS_DATA_KEY, JSON.stringify(listsToMaps({ tasks, shopping, notes }))); } catch (e) {}
   }
+  // ---------- Anmeldung ----------
+  function renderLoginScreen(message) {
+    const root = document.getElementById("root");
+    root.innerHTML = `
+      <div class="setup" id="loginScreen">
+        <h2>Huushaut</h2>
+        <p>Melde dich mit deinem Google-Konto an, um den Haushaltsplan, die Einkaufsliste und die Notizen zu sehen.</p>
+        ${message ? `<p style="color:var(--terracotta);">${escapeHtml(message)}</p>` : ""}
+        <button class="plain" id="loginBtn">Mit Google anmelden</button>
+      </div>`;
+    document.getElementById("loginBtn").onclick = login;
+  }
+  function renderDeniedScreen() {
+    const root = document.getElementById("root");
+    root.innerHTML = `
+      <div class="setup" id="loginScreen">
+        <h2>Kein Zugriff</h2>
+        <p>Das Konto <b>${escapeHtml(currentUser ? currentUser.email || "" : "")}</b> ist nicht für Huushaut freigeschaltet. Melde dich mit dem richtigen Google-Konto an, oder lass die Adresse in den Firestore-Regeln eintragen.</p>
+        <button class="plain" id="logoutBtn">Mit anderem Konto anmelden</button>
+      </div>`;
+    document.getElementById("logoutBtn").onclick = logout;
+  }
+  function authErrorText(e) {
+    const code = e && e.code;
+    if (code === "auth/unauthorized-domain") return "Diese Adresse ist in Firebase noch nicht für die Anmeldung freigegeben (Authentication → Einstellungen → Autorisierte Domains).";
+    if (code === "auth/operation-not-allowed") return "Google-Anmeldung ist in Firebase noch nicht eingeschaltet (Authentication → Anmeldemethode).";
+    if (code === "auth/network-request-failed") return "Keine Internetverbindung. Für die erste Anmeldung braucht es Netz.";
+    return "Anmeldung fehlgeschlagen. Bitte nochmal versuchen.";
+  }
+  async function login() {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      // In manchen Homescreen-Apps (v. a. iOS) gehen keine Popups — dann per Weiterleitung
+      if (e && ["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/web-storage-unsupported"].includes(e.code)) {
+        try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+      }
+      if (e && (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) return;
+      console.error(e);
+      renderLoginScreen(authErrorText(e));
+    }
+  }
+  async function logout() {
+    try { localStorage.removeItem(LS_DATA_KEY); localStorage.removeItem(LS_LEGACY_KEY); } catch (e) {}
+    // Offline-Kopie der Datenbank von diesem Gerät entfernen
+    try { await terminate(db); await clearIndexedDbPersistence(db); } catch (e) { console.error(e); }
+    try { await signOut(auth); } catch (e) { console.error(e); }
+    location.reload();
+  }
+
+  // ---------- Firebase-Verbindung ----------
   function connectFirebase(cfg) {
     try {
       const app = initializeApp(cfg);
@@ -1030,45 +1098,70 @@
       }
       dataRef = doc(db, "household", DATA_DOC);
       legacyRef = doc(db, "household", LEGACY_DOC);
-
-      onSnapshot(dataRef, { includeMetadataChanges: true }, (snap) => {
-        const fromServer = !snap.metadata.fromCache;
-        if (fromServer) connStatus = "ok";
-        if (!snap.exists()) {
-          // Nichts schreiben, solange nicht feststeht, dass das Dokument wirklich fehlt
-          dataReady = false;
-          if (fromServer) migrateLegacy();
-          renderIfChanged();
-          return;
+      auth = getAuth(app);
+      getRedirectResult(auth).catch((e) => { console.error(e); renderLoginScreen(authErrorText(e)); });
+      onAuthStateChanged(auth, (user) => {
+        const wasSignedIn = !!currentUser;
+        currentUser = user;
+        authChecked = true;
+        if (user) startListeners();
+        else if (wasSignedIn || listenersStarted) { location.reload(); return; }
+        else {
+          // Nicht angemeldet: zwischengespeicherte Daten nicht weiter anzeigen
+          try { localStorage.removeItem(LS_DATA_KEY); localStorage.removeItem(LS_LEGACY_KEY); } catch (e) {}
+          applyLists({ tasks: [], shopping: [], notes: [] });
         }
-        dataReady = true;
-        remoteData = snap.data();
-        applyLists(readLists(remoteData));
-        saveLocalCache();
-        renderIfChanged();
-        if (fromServer && !snap.metadata.hasPendingWrites) {
-          applyResets();
-          importLegacyAdditions();
-          dailyBackup();
-        }
-      }, (err) => {
-        console.error(err);
-        connStatus = "err";
-        renderIfChanged();
-        showToast("Verbindung fehlgeschlagen — Zugangsdaten oder Firestore-Regeln prüfen");
+        lastRenderedJson = null;
+        renderApp();
       });
-
-      onSnapshot(legacyRef, (snap) => {
-        if (snap.metadata.fromCache) return;
-        legacyData = snap.exists() ? snap.data() : null;
-        importLegacyAdditions();
-      }, (err) => console.error(err));
     } catch (e) {
       console.error(e);
       connStatus = "err";
       renderApp();
       showToast("Zugangsdaten scheinen ungültig");
     }
+  }
+  function onListenError(err) {
+    console.error(err);
+    if (err && err.code === "permission-denied" && currentUser) {
+      accessDenied = true;
+      renderApp();
+      return;
+    }
+    connStatus = "err";
+    renderIfChanged();
+    showToast("Verbindung fehlgeschlagen — Zugangsdaten oder Firestore-Regeln prüfen");
+  }
+  function startListeners() {
+    if (listenersStarted) return;
+    listenersStarted = true;
+    onSnapshot(dataRef, { includeMetadataChanges: true }, (snap) => {
+      const fromServer = !snap.metadata.fromCache;
+      if (fromServer) connStatus = "ok";
+      if (!snap.exists()) {
+        // Nichts schreiben, solange nicht feststeht, dass das Dokument wirklich fehlt
+        dataReady = false;
+        if (fromServer) migrateLegacy();
+        renderIfChanged();
+        return;
+      }
+      dataReady = true;
+      remoteData = snap.data();
+      applyLists(readLists(remoteData));
+      saveLocalCache();
+      renderIfChanged();
+      if (fromServer && !snap.metadata.hasPendingWrites) {
+        applyResets();
+        importLegacyAdditions();
+        dailyBackup();
+      }
+    }, onListenError);
+
+    onSnapshot(legacyRef, (snap) => {
+      if (snap.metadata.fromCache) return;
+      legacyData = snap.exists() ? snap.data() : null;
+      importLegacyAdditions();
+    }, (err) => console.error(err));
   }
 
   // ---------- Start ----------
