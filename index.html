@@ -187,7 +187,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import { initializeFirestore, getFirestore, persistentLocalCache, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import { initializeFirestore, getFirestore, persistentLocalCache, doc, collection, setDoc, updateDoc, getDoc, getDocs, deleteDoc, deleteField, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const CATEGORIES = {
     weekly: { label: "Wöchentlich", accent: "var(--weekly)", ink: "var(--weekly-ink)", note: "Kehrt am Montag zurück" },
@@ -195,7 +195,18 @@
     once: { label: "Einmalig", accent: "var(--once)", ink: "var(--once-ink)", note: "Verschwindet endgültig" },
   };
   const PEOPLE = { Dome: "#2F6D5C", Sarah: "#8B4B58" };
-  const LS_DATA_KEY = "haushaltsplan-data-cache";
+  const LS_DATA_KEY = "huushaut-data-v2-cache";
+  const LS_LEGACY_KEY = "haushaltsplan-data-cache";
+
+  // Alle Daten liegen in household/data-v2, jeder Eintrag als eigenes Feld
+  // (tasks.<id>, shopping.<id>, notes.<id>). Geschrieben wird immer nur das
+  // Feld, das sich ändert — so kann ein Gerät mit veraltetem Stand nie mehr
+  // die Einträge des anderen überschreiben. household/tasks ist das alte
+  // Dokument, das noch alte App-Versionen beschreiben.
+  const DATA_DOC = "data-v2";
+  const LEGACY_DOC = "tasks";
+  const BACKUP_PREFIX = "backup-";
+  const BACKUP_KEEP_DAYS = 30;
 
   const ICON_PLAN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10.5" /><path d="M12 13.5c-3 0-6.5 2-7.5 6.5h15c-1-4.5-4.5-6.5-7.5-6.5Z" /><path d="M8 20l-1.5 1M16 20l1.5 1M12 20v1.3" /></svg>`;
   const ICON_SHOP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1.5 10.5a1.5 1.5 0 0 1-1.5 1.5H8a1.5 1.5 0 0 1-1.5-1.5L5 9Z" /><path d="M8.5 9a3.5 3.5 0 0 1 7 0" /></svg>`;
@@ -219,9 +230,17 @@
   let activeChapter = "home"; // home | plan | shopping | notes
   let activeTab = "weekly";   // weekly | monthly | once | erledigt (innerhalb "plan")
   let db = null;
-  let docRef = null;
+  let dataRef = null;
+  let legacyRef = null;
   let connStatus = "wait"; // wait | ok | err
   let saveError = null;
+  let remoteData = null;     // zuletzt empfangener Stand von data-v2
+  let legacyData = null;     // zuletzt vom Server empfangener Stand des alten Dokuments
+  let dataReady = false;     // erst schreiben, wenn data-v2 sicher existiert
+  let migrating = false;
+  let lastRenderedJson = null;
+  let pendingRender = false; // Neuzeichnen aufgeschoben, solange gezogen wird
+  let backupDoneFor = null;
 
   const pad = (n) => String(n).padStart(2, "0");
   function getISOWeekKey(d) {
@@ -263,7 +282,7 @@
     document.getElementById("toastClose").onclick = () => (wrap.innerHTML = "");
     setTimeout(() => (wrap.innerHTML = ""), 2200);
   }
-  function askConfirm(message, onYes) {
+  function askConfirm(message, onYes, yesLabel = "Ja, löschen") {
     const wrap = document.getElementById("confirmOverlay");
     wrap.innerHTML = `
       <div style="position:fixed;inset:0;background:rgba(58,44,30,0.4);display:flex;align-items:center;justify-content:center;z-index:30;padding:20px;">
@@ -271,7 +290,7 @@
           <p style="font-size:14px;margin:0 0 16px;line-height:1.5;color:var(--ink);">${escapeHtml(message)}</p>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button id="confirmNoBtn" style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">Nein</button>
-            <button id="confirmYesBtn" style="background:var(--terracotta);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">Ja, löschen</button>
+            <button id="confirmYesBtn" style="background:var(--terracotta);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">${escapeHtml(yesLabel)}</button>
           </div>
         </div>
       </div>`;
@@ -279,67 +298,199 @@
     document.getElementById("confirmYesBtn").onclick = () => { wrap.innerHTML = ""; onYes(); };
   }
 
-  function applyResets(list) {
-    const now = new Date();
-    let changed = false;
-    const next = list.map((t) => {
-      if (t.status === "done" && (t.category === "weekly" || t.category === "monthly")) {
-        const cpk = currentPeriodKey(t.category, now);
-        if (t.periodKey !== cpk) {
-          changed = true;
-          return { ...t, status: "active", doneBy: null, doneAt: null, periodKey: null };
-        }
-      }
-      return t;
-    });
-    return { next, changed };
+  // ---------- Datenmodell ----------
+  const byShopOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0) || (b.createdAt || 0) - (a.createdAt || 0);
+  function arrayToMap(arr) {
+    const map = {};
+    (Array.isArray(arr) ? arr : []).forEach((x) => { if (x && x.id) map[x.id] = x; });
+    return map;
+  }
+  // Wandelt den Inhalt eines Dokuments (neues oder altes Format) in die drei Listen um.
+  // Halbe Einträge (z. B. gelöscht, während ein anderes Gerät sie noch änderte) werden ignoriert.
+  function readLists(data) {
+    const d = data || {};
+    const legacy = Array.isArray(d.list) || Array.isArray(d.shopping) || Array.isArray(d.notes);
+    const t = legacy ? arrayToMap(d.list) : d.tasks || {};
+    const s = legacy ? arrayToMap((d.shopping || []).map((x, i) => ({ ...x, order: i }))) : d.shopping || {};
+    const n = legacy ? arrayToMap(d.notes) : d.notes || {};
+    return {
+      tasks: Object.values(t).filter((x) => x && x.id && x.title),
+      shopping: Object.values(s).filter((x) => x && x.id && x.text).sort(byShopOrder),
+      notes: Object.values(n).filter((x) => x && x.id && x.text),
+    };
+  }
+  function listsToMaps(lists) {
+    return { tasks: arrayToMap(lists.tasks), shopping: arrayToMap(lists.shopping), notes: arrayToMap(lists.notes) };
+  }
+  function applyLists(lists) {
+    tasks = lists.tasks;
+    shopping = lists.shopping;
+    notes = lists.notes;
+  }
+  function renderIfChanged() {
+    const json = JSON.stringify([connStatus, saveError, tasks, shopping, notes]);
+    if (json === lastRenderedJson) return;
+    if (dragState) { pendingRender = true; return; }
+    lastRenderedJson = json;
+    // Einstellungen nicht unter den Fingern wegreißen
+    if (!document.getElementById("settingsScreen")) renderApp();
   }
 
-  async function persist(nextTasks, nextShopping, nextNotes) {
-    tasks = nextTasks;
-    shopping = nextShopping;
-    notes = nextNotes;
-    renderApp();
-    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: nextTasks, shopping: nextShopping, notes: nextNotes })); } catch (e) {}
-    if (!db) return;
-    try {
-      await setDoc(docRef, { list: nextTasks, shopping: nextShopping, notes: nextNotes });
-      if (saveError) { saveError = null; renderApp(); }
-    } catch (e) {
+  // Schreibt nur die übergebenen Felder (z. B. {"shopping.abc.bought": true}).
+  // Die Anzeige aktualisiert sich über onSnapshot sofort, auch offline.
+  function write(changes) {
+    if (!dataReady) {
+      showToast("Noch nicht mit der Datenbank verbunden — bitte kurz warten");
+      return false;
+    }
+    if (Object.keys(changes).length === 0) return true;
+    updateDoc(dataRef, changes).then(() => {
+      if (saveError) { saveError = null; renderIfChanged(); }
+    }).catch((e) => {
       console.error(e);
       saveError = e && e.code === "permission-denied"
         ? "Speichern blockiert: Firestore-Regeln erlauben kein Schreiben. In der Firebase-Konsole unter 'Firestore Database → Regeln' prüfen und veröffentlichen."
-        : "Speichern fehlgeschlagen. Änderungen sind nur lokal auf diesem Gerät gespeichert und gehen beim Schließen evtl. verloren, bis die Verbindung wieder da ist.";
-      renderApp();
+        : "Speichern fehlgeschlagen. Bitte die App neu laden und den Eintrag prüfen.";
+      renderIfChanged();
+    });
+    return true;
+  }
+
+  // Wöchentliche/monatliche Aufgaben zurücksetzen. Läuft nur mit einem frisch vom
+  // Server bestätigten Stand und schreibt nur die betroffenen Aufgaben.
+  function applyResets() {
+    const now = new Date();
+    const changes = {};
+    tasks.forEach((t) => {
+      if (t.status === "done" && (t.category === "weekly" || t.category === "monthly") && t.periodKey !== currentPeriodKey(t.category, now)) {
+        changes[`tasks.${t.id}.status`] = "active";
+        changes[`tasks.${t.id}.doneBy`] = null;
+        changes[`tasks.${t.id}.doneAt`] = null;
+        changes[`tasks.${t.id}.periodKey`] = null;
+      }
+    });
+    write(changes);
+  }
+
+  // ---------- Sicherungen ----------
+  const backupRef = (id) => doc(db, "household", BACKUP_PREFIX + id);
+  const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  function backupPayload(reason, data) {
+    return { savedAt: Date.now(), reason, ...listsToMaps(readLists(data)) };
+  }
+  async function createBackup(reason) {
+    const d = new Date();
+    const id = `${dayKey(d)}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${reason}`;
+    await setDoc(backupRef(id), backupPayload(reason, remoteData));
+  }
+  // Einmal pro Tag den Stand sichern und Sicherungen älter als BACKUP_KEEP_DAYS entfernen.
+  async function dailyBackup() {
+    const today = dayKey(new Date());
+    if (backupDoneFor === today) return;
+    backupDoneFor = today;
+    try {
+      const ref = backupRef(today);
+      const existing = await getDoc(ref);
+      if (!existing.exists()) await setDoc(ref, backupPayload("täglich", remoteData));
+      const cutoff = Date.now() - BACKUP_KEEP_DAYS * 86400000;
+      const all = await listBackups();
+      await Promise.all(all.filter((b) => b.savedAt < cutoff).map((b) => deleteDoc(backupRef(b.id))));
+    } catch (e) {
+      console.error("Sicherung fehlgeschlagen", e);
+      backupDoneFor = null;
     }
+  }
+  async function listBackups() {
+    const snap = await getDocs(collection(db, "household"));
+    const out = [];
+    snap.forEach((d) => {
+      if (!d.id.startsWith(BACKUP_PREFIX)) return;
+      const data = d.data();
+      out.push({ id: d.id.slice(BACKUP_PREFIX.length), savedAt: data.savedAt || 0, reason: data.reason || "", data });
+    });
+    return out.sort((a, b) => b.savedAt - a.savedAt);
+  }
+  async function restoreBackup(backup) {
+    await createBackup("vor-wiederherstellen");
+    const maps = listsToMaps(readLists(backup.data));
+    await setDoc(dataRef, { ...remoteData, ...maps });
+  }
+
+  // ---------- Umstellung vom alten Dokument ----------
+  // Legt data-v2 einmalig aus household/tasks an. Die Transaktion sorgt dafür,
+  // dass das auch bei zwei gleichzeitig startenden Geräten nur einmal passiert.
+  async function migrateLegacy() {
+    if (migrating) return;
+    migrating = true;
+    try {
+      await runTransaction(db, async (tx) => {
+        const current = await tx.get(dataRef);
+        if (current.exists()) return;
+        const old = await tx.get(legacyRef);
+        const oldData = old.exists() ? old.data() : {};
+        tx.set(backupRef(`${dayKey(new Date())}-umstellung`), backupPayload("umstellung", oldData));
+        tx.set(dataRef, { schema: 2, migratedAt: Date.now(), legacyImported: {}, ...listsToMaps(readLists(oldData)) });
+      });
+    } catch (e) {
+      console.error(e);
+      saveError = e && e.code === "permission-denied"
+        ? "Datenbank-Umstellung blockiert: Firestore-Regeln erlauben kein Schreiben in 'household/data-v2'."
+        : "Datenbank-Umstellung fehlgeschlagen. Bitte die App neu laden.";
+      renderIfChanged();
+    } finally {
+      migrating = false;
+    }
+  }
+  // Ein Gerät mit noch alter App-Version schreibt weiter ins alte Dokument.
+  // Was dort nach der Umstellung neu angelegt wurde, wird übernommen (jeweils nur einmal).
+  function importLegacyAdditions() {
+    if (!dataReady || !legacyData || !remoteData || !remoteData.migratedAt) return;
+    const since = remoteData.migratedAt;
+    const imported = remoteData.legacyImported || {};
+    const old = readLists(legacyData);
+    const known = new Set([...tasks, ...shopping, ...notes].map((x) => x.id));
+    const minOrder = shopping.length ? shopping[0].order ?? 0 : 0;
+    const changes = {};
+    const take = (kind, list) => list.forEach((x) => {
+      if ((x.createdAt || 0) <= since || known.has(x.id) || imported[x.id]) return;
+      changes[`${kind}.${x.id}`] = kind === "shopping" ? { ...x, order: minOrder - 1 - (x.order ?? 0) } : x;
+      changes[`legacyImported.${x.id}`] = true;
+    });
+    take("tasks", old.tasks);
+    take("shopping", old.shopping);
+    take("notes", old.notes);
+    write(changes);
   }
 
   // ---------- Aufgaben ----------
-  async function addTask(e) {
+  function addTask(e) {
     e.preventDefault();
     const input = document.getElementById("newTitle");
     const title = input.value.trim();
     if (!title) return;
     const task = { id: uid(), title, category: activeTab, status: "active", createdAt: Date.now(), doneBy: null, doneAt: null, periodKey: null };
-    await persist([task, ...tasks], shopping, notes);
+    if (!write({ [`tasks.${task.id}`]: task })) return;
+    input.value = "";
     focusInput("newTitle");
   }
-  async function markDone(id, person) {
+  function markDone(id, person) {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     if (task.category === "once") {
-      showToast(`„${task.title}" erledigt von ${person}`);
-      await persist(tasks.filter((t) => t.id !== id), shopping, notes);
+      if (write({ [`tasks.${id}`]: deleteField() })) showToast(`„${task.title}" erledigt von ${person}`);
       return;
     }
-    const now = new Date();
-    const next = tasks.map((t) => t.id === id ? { ...t, status: "done", doneBy: person, doneAt: Date.now(), periodKey: currentPeriodKey(t.category, now) } : t);
-    await persist(next, shopping, notes);
+    write({
+      [`tasks.${id}.status`]: "done",
+      [`tasks.${id}.doneBy`]: person,
+      [`tasks.${id}.doneAt`]: Date.now(),
+      [`tasks.${id}.periodKey`]: currentPeriodKey(task.category, new Date()),
+    });
   }
   function deleteTask(id) {
     const task = tasks.find((t) => t.id === id);
-    askConfirm(`„${task ? task.title : "Aufgabe"}" wirklich löschen?`, async () => {
-      await persist(tasks.filter((t) => t.id !== id), shopping, notes);
+    askConfirm(`„${task ? task.title : "Aufgabe"}" wirklich löschen?`, () => {
+      write({ [`tasks.${id}`]: deleteField() });
     });
   }
   function countFor(cat) {
@@ -348,41 +499,50 @@
   }
 
   // ---------- Einkaufsliste ----------
-  async function addShoppingItem(e) {
+  function addShoppingItem(e) {
     e.preventDefault();
     const input = document.getElementById("newShopItem");
     const text = input.value.trim();
     if (!text) return;
-    const item = { id: uid(), text, createdAt: Date.now() };
-    await persist(tasks, [item, ...shopping], notes);
+    const order = shopping.length ? (shopping[0].order ?? 0) - 1 : 0;
+    const item = { id: uid(), text, createdAt: Date.now(), bought: false, order };
+    if (!write({ [`shopping.${item.id}`]: item })) return;
+    input.value = "";
     focusInput("newShopItem");
   }
-  async function toggleBought(id) {
-    const next = shopping.map((s) => (s.id === id ? { ...s, bought: !s.bought } : s));
-    await persist(tasks, next, notes);
+  function toggleBought(id) {
+    const item = shopping.find((s) => s.id === id);
+    if (!item) return;
+    write({ [`shopping.${id}.bought`]: !item.bought });
   }
   function clearBoughtItems() {
-    const boughtCount = shopping.filter((s) => s.bought).length;
-    if (boughtCount === 0) return;
-    askConfirm(`${boughtCount} durchgestrichene ${boughtCount === 1 ? "Ding" : "Dinge"} endgültig löschen?`, async () => {
-      await persist(tasks, shopping.filter((s) => !s.bought), notes);
+    const bought = shopping.filter((s) => s.bought);
+    if (bought.length === 0) return;
+    askConfirm(`${bought.length} durchgestrichene ${bought.length === 1 ? "Ding" : "Dinge"} endgültig löschen?`, () => {
+      const changes = {};
+      bought.forEach((s) => { changes[`shopping.${s.id}`] = deleteField(); });
+      write(changes);
     });
   }
   let editingShopId = null;
+  let editingShopDraft = null; // Getipptes bleibt erhalten, falls zwischendurch neu gezeichnet wird
   function startEditShopping(id) {
     editingShopId = id;
+    editingShopDraft = null;
     renderShoppingContent();
   }
   function cancelShoppingEdit() {
     editingShopId = null;
+    editingShopDraft = null;
     renderShoppingContent();
   }
-  async function saveShoppingEdit(id, rawText) {
+  function saveShoppingEdit(id, rawText) {
     const text = rawText.trim();
     editingShopId = null;
-    if (!text) { renderShoppingContent(); return; }
-    const next = shopping.map((s) => (s.id === id ? { ...s, text } : s));
-    await persist(tasks, next, notes);
+    editingShopDraft = null;
+    const item = shopping.find((s) => s.id === id);
+    if (!text || !item || text === item.text) { renderShoppingContent(); return; }
+    write({ [`shopping.${id}.text`]: text });
   }
 
   // ---------- Einkaufsliste: Ziehen zum Sortieren ----------
@@ -434,29 +594,47 @@
     rowEl.removeEventListener("pointerup", shoppingDragEnd);
     rowEl.removeEventListener("pointercancel", shoppingDragEnd);
     dragState = null;
-    if (hoverIndex !== startIndex) {
-      const next = [...shopping];
-      const [moved] = next.splice(startIndex, 1);
-      next.splice(hoverIndex, 0, moved);
-      persist(tasks, next, notes);
-    } else {
-      renderShoppingContent();
+    const moved = shopping.find((s) => s.id === id);
+    if (hoverIndex !== startIndex && moved) {
+      // Nur die Position des verschobenen Eintrags ändern: neuer Wert zwischen den Nachbarn
+      const rest = shopping.filter((s) => s.id !== id);
+      const prev = rest[hoverIndex - 1];
+      const next = rest[hoverIndex];
+      let order;
+      if (prev && next) order = ((prev.order ?? 0) + (next.order ?? 0)) / 2;
+      else if (prev) order = (prev.order ?? 0) + 1;
+      else if (next) order = (next.order ?? 0) - 1;
+      else order = 0;
+      const tooTight = (prev && Math.abs(order - (prev.order ?? 0)) < 1e-6) || (next && Math.abs((next.order ?? 0) - order) < 1e-6);
+      if (tooTight) {
+        // Abstände nach vielen Verschiebungen aufgebraucht: einmal alle neu nummerieren
+        const changes = {};
+        rest.splice(hoverIndex, 0, moved);
+        rest.forEach((s, i) => { changes[`shopping.${s.id}.order`] = i; });
+        write(changes);
+      } else {
+        write({ [`shopping.${id}.order`]: order });
+      }
     }
+    pendingRender = false;
+    lastRenderedJson = null;
+    renderShoppingContent();
   }
 
   // ---------- Notizen ----------
-  async function addNote(e) {
+  function addNote(e) {
     e.preventDefault();
     const input = document.getElementById("newNote");
     const text = input.value.trim();
     if (!text) return;
     const note = { id: uid(), text, createdAt: Date.now() };
-    await persist(tasks, shopping, [note, ...notes]);
+    if (!write({ [`notes.${note.id}`]: note })) return;
+    input.value = "";
     focusInput("newNote");
   }
   function deleteNote(id) {
-    askConfirm("Notiz wirklich löschen?", async () => {
-      await persist(tasks, shopping, notes.filter((n) => n.id !== id));
+    askConfirm("Notiz wirklich löschen?", () => {
+      write({ [`notes.${id}`]: deleteField() });
     });
   }
 
@@ -646,7 +824,8 @@
           input.type = "text";
           input.className = "edit-input";
           input.autocomplete = "off";
-          input.value = s.text;
+          input.value = editingShopDraft ?? s.text;
+          input.addEventListener("input", () => { editingShopDraft = input.value; });
           input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") { e.preventDefault(); saveShoppingEdit(s.id, input.value); }
             if (e.key === "Escape") { e.preventDefault(); cancelShoppingEdit(); }
@@ -670,7 +849,8 @@
           li.appendChild(saveBtn);
           li.appendChild(cancelBtn);
           list.appendChild(li);
-          requestAnimationFrame(() => { input.focus(); input.select(); });
+          const firstOpen = editingShopDraft === null;
+          requestAnimationFrame(() => { input.focus(); if (firstOpen) input.select(); });
         } else {
           const checkMark = s.bought ? `<path d="M5.5 10 8.5 13 14.5 6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>` : "";
           li.innerHTML = `
@@ -746,20 +926,27 @@
   function renderSetupScreen() {
     const root = document.getElementById("root");
     root.innerHTML = `
-      <div class="setup">
+      <div class="setup" id="settingsScreen">
         <h2>Einstellungen</h2>
         <p>Verbunden mit Firebase-Projekt <b>${FIREBASE_CONFIG.projectId}</b>.</p>
         <button class="plain" id="backBtn">← Zurück</button>
 
         <div style="margin-top:36px; border-top:1px solid var(--line); padding-top:20px;">
+          <h2 style="font-size:17px;">Sicherungen</h2>
+          <p>Die App sichert jeden Tag automatisch alle Aufgaben, die Einkaufsliste und die Notizen (die letzten ${BACKUP_KEEP_DAYS} Tage). Hier kannst du einen alten Stand für dich und Sarah zurückholen. Der aktuelle Stand wird vorher auch gesichert.</p>
+          <div id="backupList"><p>Lade Sicherungen…</p></div>
+        </div>
+
+        <div style="margin-top:36px; border-top:1px solid var(--line); padding-top:20px;">
           <h2 style="color:var(--terracotta); font-size:17px;">Gefahrenzone</h2>
-          <p>Löscht <b>alle</b> Aufgaben, die Einkaufsliste und alle Notizen unwiderruflich, für dich und Sarah. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
+          <p>Löscht <b>alle</b> Aufgaben, die Einkaufsliste und alle Notizen, für dich und Sarah. Vorher wird eine Sicherung angelegt. Zum Bestätigen unten <code>LÖSCHEN</code> eintippen.</p>
           <input id="resetConfirmInput" type="text" placeholder="LÖSCHEN eintippen" />
           <button id="doResetBtn" disabled style="background:#C9A9AC; color:#fff; border:none; border-radius:10px; padding:11px 18px; font-size:14px; margin-top:12px; cursor:not-allowed; font-family:'Courier Prime',monospace;">Endgültig alles löschen</button>
         </div>
       </div>`;
 
-    document.getElementById("backBtn").onclick = renderApp;
+    document.getElementById("backBtn").onclick = () => { lastRenderedJson = null; renderApp(); };
+    renderBackupList();
 
     const input = document.getElementById("resetConfirmInput");
     const btn = document.getElementById("doResetBtn");
@@ -771,13 +958,67 @@
     });
     btn.onclick = async () => {
       if (input.value.trim() !== "LÖSCHEN") return;
-      await persist([], [], []);
-      showToast("Alles gelöscht");
+      if (!dataReady) { showToast("Noch nicht mit der Datenbank verbunden"); return; }
+      try {
+        await createBackup("vor-loeschen");
+      } catch (e) {
+        console.error(e);
+        showToast("Sicherung fehlgeschlagen — es wurde nichts gelöscht");
+        return;
+      }
+      write({ tasks: {}, shopping: {}, notes: {} });
+      showToast("Alles gelöscht (Sicherung angelegt)");
+      lastRenderedJson = null;
       renderApp();
     };
   }
+  async function renderBackupList() {
+    const box = document.getElementById("backupList");
+    if (!box) return;
+    if (!db) { box.innerHTML = "<p>Keine Verbindung zur Datenbank.</p>"; return; }
+    let backups;
+    try {
+      backups = await listBackups();
+    } catch (e) {
+      console.error(e);
+      if (document.getElementById("backupList")) box.innerHTML = "<p>Sicherungen konnten nicht geladen werden.</p>";
+      return;
+    }
+    if (!document.getElementById("backupList")) return;
+    if (backups.length === 0) { box.innerHTML = "<p>Noch keine Sicherung vorhanden.</p>"; return; }
+    box.innerHTML = "";
+    backups.forEach((b) => {
+      const lists = readLists(b.data);
+      const d = new Date(b.savedAt);
+      const when = `${formatDate(b.savedAt)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;";
+      row.innerHTML = `<span>${when} · ${escapeHtml(b.reason)}<br><small>${lists.tasks.length} Aufgaben · ${lists.shopping.length} Einkauf · ${lists.notes.length} Notizen</small></span>`;
+      const btn = document.createElement("button");
+      btn.className = "plain";
+      btn.style.marginTop = "0";
+      btn.textContent = "Zurückholen";
+      btn.onclick = () => askConfirm(`Stand vom ${when} zurückholen? Der aktuelle Stand wird vorher gesichert.`, async () => {
+        if (!dataReady) { showToast("Noch nicht mit der Datenbank verbunden"); return; }
+        try {
+          await restoreBackup(b);
+          showToast("Stand zurückgeholt");
+          lastRenderedJson = null;
+          renderApp();
+        } catch (e) {
+          console.error(e);
+          showToast("Zurückholen fehlgeschlagen");
+        }
+      }, "Ja, zurückholen");
+      row.appendChild(btn);
+      box.appendChild(row);
+    });
+  }
 
   // ---------- Firebase-Verbindung ----------
+  function saveLocalCache() {
+    try { localStorage.setItem(LS_DATA_KEY, JSON.stringify(listsToMaps({ tasks, shopping, notes }))); } catch (e) {}
+  }
   function connectFirebase(cfg) {
     try {
       const app = initializeApp(cfg);
@@ -787,47 +1028,62 @@
         console.warn("Offline-Speicher nicht verfügbar, nutze Standard-Verbindung", e);
         db = getFirestore(app);
       }
-      docRef = doc(db, "household", "tasks");
-      onSnapshot(docRef, (snap) => {
-        connStatus = "ok";
-        const data = snap.exists() ? snap.data() : {};
-        const { next, changed } = applyResets(data.list || []);
-        tasks = next;
-        shopping = data.shopping || [];
-        notes = data.notes || [];
-        renderApp();
-        try { localStorage.setItem(LS_DATA_KEY, JSON.stringify({ list: tasks, shopping, notes })); } catch (e) {}
-        if (changed) setDoc(docRef, { list: next, shopping, notes });
+      dataRef = doc(db, "household", DATA_DOC);
+      legacyRef = doc(db, "household", LEGACY_DOC);
+
+      onSnapshot(dataRef, { includeMetadataChanges: true }, (snap) => {
+        const fromServer = !snap.metadata.fromCache;
+        if (fromServer) connStatus = "ok";
+        if (!snap.exists()) {
+          // Nichts schreiben, solange nicht feststeht, dass das Dokument wirklich fehlt
+          dataReady = false;
+          if (fromServer) migrateLegacy();
+          renderIfChanged();
+          return;
+        }
+        dataReady = true;
+        remoteData = snap.data();
+        applyLists(readLists(remoteData));
+        saveLocalCache();
+        renderIfChanged();
+        if (fromServer && !snap.metadata.hasPendingWrites) {
+          applyResets();
+          importLegacyAdditions();
+          dailyBackup();
+        }
       }, (err) => {
         console.error(err);
         connStatus = "err";
-        renderApp();
+        renderIfChanged();
         showToast("Verbindung fehlgeschlagen — Zugangsdaten oder Firestore-Regeln prüfen");
       });
+
+      onSnapshot(legacyRef, (snap) => {
+        if (snap.metadata.fromCache) return;
+        legacyData = snap.exists() ? snap.data() : null;
+        importLegacyAdditions();
+      }, (err) => console.error(err));
     } catch (e) {
       console.error(e);
-      renderSetupScreen("Zugangsdaten scheinen ungültig. Bitte nochmal prüfen.");
+      connStatus = "err";
+      renderApp();
+      showToast("Zugangsdaten scheinen ungültig");
     }
   }
 
   // ---------- Start ----------
   // Zuletzt gespeicherten Stand sofort anzeigen, damit die App nicht auf die
   // Live-Verbindung warten muss — im Hintergrund wird dann synchronisiert.
+  // Dieser Stand wird nur angezeigt, nie zurück in die Datenbank geschrieben.
   try {
-    const cached = localStorage.getItem(LS_DATA_KEY);
-    if (cached) {
-      const data = JSON.parse(cached);
-      const { next } = applyResets(data.list || []);
-      tasks = next;
-      shopping = data.shopping || [];
-      notes = data.notes || [];
-    }
+    const cached = localStorage.getItem(LS_DATA_KEY) || localStorage.getItem(LS_LEGACY_KEY);
+    if (cached) applyLists(readLists(JSON.parse(cached)));
   } catch (e) {}
   renderApp();
   connectFirebase(FIREBASE_CONFIG);
 
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js").catch(() => {}));
+    window.addEventListener("load", () => navigator.serviceWorker.register("serviceworker.js").catch(() => {}));
   }
 </script>
 </body>
