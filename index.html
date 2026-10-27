@@ -183,8 +183,15 @@
 
   /* ---- Serien: Fernseh-Abend ---- */
   .chapter--tv { background-image: url(img/serien.jpg); }
-  .tv-room { position: relative; margin: 0 -16px; padding: 18px 16px 26px; min-height: 70vh; border-radius: 30px 30px 0 0; color: #F3E9DC;
-    background: radial-gradient(ellipse 70% 40% at 85% 0%, rgba(255,176,92,.28), transparent 70%), radial-gradient(ellipse 60% 50% at 0% 100%, rgba(120,90,255,.18), transparent 70%), linear-gradient(180deg, #2A2240, #17142A 60%); box-shadow: 0 -6px 0 var(--lift); }
+  /* Im Serien-Bereich wird die ganze Seite zum dunklen Wohnzimmer, samt Kopfzeile */
+  html.tv-mode, html.tv-mode body { background-color: #17142A; }
+  html.tv-mode body { color: #F3E9DC; background: radial-gradient(ellipse 80% 45% at 90% 0%, rgba(255,176,92,.26), transparent 70%), radial-gradient(ellipse 70% 50% at 0% 100%, rgba(120,90,255,.18), transparent 70%), linear-gradient(180deg, #2A2240, #17142A 65%) fixed; }
+  html.tv-mode body::before, html.tv-mode body::after { display: none; }
+  html.tv-mode h1 { color: #fff; }
+  html.tv-mode .sub { color: rgba(243,233,220,.6); }
+  html.tv-mode .back-btn, html.tv-mode .icon-btn { background: rgba(255,255,255,.08); color: #F3E9DC; box-shadow: none; }
+  html.tv-mode .confirm-bar { background: #2A2240; color: #F3E9DC; }
+  .tv-room { position: relative; color: #F3E9DC; }
   .tv-room.enter { animation: dim .6s ease both; }
   @keyframes dim { from { filter: brightness(1.8) saturate(.6); } }
   .tv-room form.add input { background: rgba(255,255,255,.08); border-color: transparent; color: #F3E9DC; box-shadow: none; }
@@ -966,9 +973,17 @@
     return days <= 0 ? "heute" : days === 1 ? "gestern" : days < 7 ? `vor ${days} Tagen` : `am ${formatDate(ts)}`;
   }
 
+  // Dunkles Wohnzimmer für den Serien-Bereich, inklusive Farbe der Statusleiste
+  function setTvMode(on) {
+    document.documentElement.classList.toggle("tv-mode", on);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", on ? "#2A2240" : "#DFF3EC");
+  }
+
   // ---------- Rendering: Rahmen ----------
   function renderApp() {
     const root = document.getElementById("root");
+    setTvMode(activeChapter === "tv" && !(authChecked && !currentUser) && !accessDenied);
     if (authChecked && !currentUser) { renderLoginScreen(); return; }
     if (accessDenied) { renderDeniedScreen(); return; }
     const entering = activeChapter !== lastChapter;
@@ -1328,6 +1343,7 @@
 
   // ---------- Einstellungen ----------
   function renderSetupScreen() {
+    setTvMode(false);
     const root = document.getElementById("root");
     root.innerHTML = `
       <div class="setup" id="settingsScreen">
